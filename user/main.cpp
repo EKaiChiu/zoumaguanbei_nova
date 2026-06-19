@@ -36,6 +36,10 @@
 #include "zf_driver_tcp_client.hpp"
 #include "zf_device_uvc.hpp"
 #include "zf_driver_pwm.hpp"
+#include "init.hpp"
+#include "image.hpp"
+#include "ips200_draw.hpp"
+#include "red_detect.hpp"
 
 // ====================== 网络配置宏定义 ======================
 #define SERVER_IP "10.18.55.68"    // TCP服务端IP地址（电脑IP，需手动修改）
