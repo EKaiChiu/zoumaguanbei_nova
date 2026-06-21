@@ -3,7 +3,7 @@
 
 #include "zf_common_headfile.hpp"
 
-typedef struct
+typedef struct red_detect_t
 {   int is_red;          // 是否有红色
     int is_found;        // 是否找到红色目标
     int center_x;        // 红色目标中心 x

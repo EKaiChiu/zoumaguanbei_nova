@@ -6,8 +6,8 @@
 
 #define RED_TOP_GAP_MAX 2 // 向上找色块顶部时允许的最大间断行数,当前为2行
 
-#define search_bottom 100 // 扫描起始行
-#define search_top 20     // 扫描结束行
+#define search_bottom 110 // 扫描起始行
+#define search_top 10     // 扫描结束行
 /*
 函数名称：红色像素判定
 功能说明：解码RGB565像素，判断是否为红色

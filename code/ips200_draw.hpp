@@ -1,6 +1,8 @@
 #ifndef ips200_draw_HPP
 #define ips200_draw_HPP
 #include "zf_common_headfile.hpp"
+typedef struct red_detect_t red_detect;  // 前向声明，避免循环包含
+#include "red_detect.hpp"
 void draw_left_line(void);        // 画左边界线（🔴红色）
 void draw_right_line(void);       // 画右边界线（🔴红色）  
 void draw_center_line(void);      // 画中线轨迹（🔵蓝色）
@@ -24,3 +26,4 @@ void draw_annotation_on_imagecopy(void);  // 边界+轨迹→灰度image_copy数
 
 
 #endif
+
