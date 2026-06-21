@@ -1,10 +1,12 @@
 #include "init.hpp"
+#include "imu660.hpp"
 
 
 uint8 beep=0;
 #define beep_pin ZF_GPIO_BEEP
 zf_device_uvc uvc_cam;
 zf_device_ips200 ips200;
+zf_device_imu imu_dev;           // IMU660RA 陀螺仪
 zf_driver_pit pit_timer;
 zf_driver_gpio beep_gpio(beep_pin,O_RDWR);
 
@@ -34,6 +36,21 @@ void init_all()
    
     if(uvc_cam.init(UVC_PATH)<0)
     {ips200.show_string(0,20,"UVC init error");}
+
+    // ---- 陀螺仪 IMU660RA 初始化 + 零偏校准 ----
+    if(imu_dev.init() != DEV_NO_FIND)
+    {
+        printf("[IMU] Device found, calibrating gyro offset...\r\n");
+        system_delay_ms(100);               // 等陀螺仪稳定
+        gyroOffsetInit(imu_dev);            // 静止采样100次，获取零偏
+        quaternion_init();                  // 姿态四元数复位（当前朝向=0°）
+        printf("[IMU] Calibration done, ready.\r\n");
+    }
+    else
+    {
+        printf("[IMU] Device not found, skip.\r\n");
+    }
+
     motor_init();          // 电机 PWM 初始化
     
      motor_argument();      // 🌟 必须取消注释！给目标速度和 PID 参数赋值
