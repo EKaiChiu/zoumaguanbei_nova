@@ -114,7 +114,7 @@ static int find_red_block(uint16 *rgb_image, red_detect *result)
             red_row_count++;
             if (red_row_count >= RED_CONFIRM_ROWS)
             {
-                confirmed_bottom = y ;
+                confirmed_bottom = y;
                 break;
             }
         }
@@ -241,17 +241,51 @@ void red_detect_first(uint16 *rgb_image, red_detect *result)
     result->is_red = (red_num > 50) ? 1 : 0;
 
     // ---- 第二趟：色块边界定位（仅在红色够多时执行） ----
-    
-    result->is_found        = 0;
-    result->center_x        = 0;
-    result->center_y        = 0;
+
+    result->is_found = 0;
+    result->center_x = 0;
+    result->center_y = 0;
     result->red_upper_bound = 0;
     result->red_lower_bound = 0;
-    result->red_left_bound  = 0;
+    result->red_left_bound = 0;
     result->red_right_bound = 0;
 
     if (result->is_red)
     {
-        find_red_block(rgb_image, result);  // 成功则覆盖 is_found=1 + 坐标
+        find_red_block(rgb_image, result); // 成功则覆盖 is_found=1 + 坐标
     }
+}
+
+/*
+函数名称：底部中间像素颜色检测
+功能说明：读取图像底部中间一个像素的RGB565值，解码并打印RGB数值
+参数说明：
+    rgb_image：RGB565格式图像（160×120）
+函数返回：无
+修改时间：2026年6月21日
+备    注：
+    取底部中间像素 (UVC_WIDTH/2, UVC_HEIGHT-1)，解码为8位RGB后通过串口打印
+example：
+    color_detect(uvc_cam.get_rgb_image_ptr());
+ */
+void color_detect(uint16 *rgb_image)
+{
+    if (rgb_image == NULL)
+        return;
+
+    int x = UVC_WIDTH / 2;  // 中间列 = 80
+    int y = UVC_HEIGHT - 1; // 最后一行（底部）= 119
+
+    uint16 pixel = rgb_image[y * 160 + x];
+
+    // 解码 RGB565 → 8位 RGB
+    int r5 = (pixel >> 11) & 0x1F;
+    int g6 = (pixel >> 5) & 0x3F;
+    int b5 = pixel & 0x1F;
+
+    int r = r5 * 255 / 31;
+    int g = g6 * 255 / 63;
+    int b = b5 * 255 / 31;
+
+    printf("bottom-center pixel(%d,%d) RGB: R=%d G=%d B=%d\r\n", x, y, r, g, b);
 }

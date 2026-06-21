@@ -230,6 +230,7 @@ int main()
         if (rgb_image != nullptr)
         {
             red_detect_first(rgb_image, &red_result);
+            color_detect(rgb_image);  // 打印底部中间像素的RGB数值
         }
 
         // ========== IPS200屏幕显示 ==========

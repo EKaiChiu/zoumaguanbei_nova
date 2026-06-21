@@ -16,4 +16,5 @@ typedef struct
 } red_detect;
 
 void red_detect_first(uint16 *rgb_image, red_detect *result);
+void color_detect(uint16 *rgb_image);
 #endif // __RED_DETECT_HPP__
