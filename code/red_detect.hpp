@@ -12,7 +12,8 @@ typedef struct red_detect_t
     int red_upper_bound; // 红色像素上边界 y 坐标
     int red_left_bound;  // 红色像素左边界 x 坐标
     int red_right_bound; // 红色像素右边界 x 坐标
-    int red_area;       // 红色像素数量
+    int red_area;         // 红色像素数量
+    int dist_to_bottom;   // 红色块中心到屏幕底部的像素距离
 } red_detect;
 
 void red_detect_first(uint16 *rgb_image, red_detect *result);

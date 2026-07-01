@@ -103,7 +103,7 @@
 //===================================================用户自定义文件===================================================
 #include "motor.hpp"
 #include "image.hpp"
-#include "fuzzy.hpp"
+#include "config.hpp"
 #include "init.hpp"
 #include "ips200_draw.hpp"
 

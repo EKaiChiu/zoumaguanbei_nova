@@ -186,6 +186,7 @@ static int find_red_block(uint16 *rgb_image, red_detect *result)
     result->red_right_bound = rx;
     result->center_x = (lx + rx) / 2;
     result->center_y = (blk_top + blk_bottom) / 2;
+    result->dist_to_bottom = 120 - result->center_y;  // 像素距离
     result->is_found = 1;
     return 1;
 }
@@ -249,6 +250,7 @@ void red_detect_first(uint16 *rgb_image, red_detect *result)
     result->red_lower_bound = 0;
     result->red_left_bound = 0;
     result->red_right_bound = 0;
+    result->dist_to_bottom = -1;
 
     if (result->is_red)
     {
