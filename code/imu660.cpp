@@ -1,6 +1,9 @@
 #include "imu660.hpp"
 #include <math.h>
 
+#ifndef PI
+#define PI 3.14159265358979f
+#endif
 // ==================== 全局变量定义 ====================
 Quaternion quat = {1.0f, 0.0f, 0.0f, 0.0f};   // 姿态四元数，姿态更新的核心状态量
 EulerAngle euler = {0.0f, 0.0f, 0.0f};          // 欧拉角输出（度），由 quaternion_to_euler 刷新
