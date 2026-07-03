@@ -55,8 +55,10 @@ float y, x;
 int test_wheel = 1;  // 测试轮选择
 int test_speed = 60; // 测试目标速度
 
-int speed_pwm_min = 800;
-float speed_pwm_feedforward = 12.0f;
+int speed_pwm_min_l = 700;
+int speed_pwm_min_r = 700;
+float speed_pwm_feedforward_l = 10.0f;
+float speed_pwm_feedforward_r = 10.0f;
 
 static void reset_speed_pid_state()
 {
@@ -109,9 +111,9 @@ static void setup_speed_test_target()
     speed_goal_r = (float)diff_speedr_expect;
 }
 
-static int calc_speed_pwm_debug(float goal, float comp)
+static int calc_speed_pwm_debug(float goal, float comp, float feedforward, int min_pwm)
 {
-    int final_pwm = (int)(goal * speed_pwm_feedforward + comp);
+    int final_pwm = (int)(goal * feedforward + comp);
 
     if (final_pwm > pwm_max)
         final_pwm = pwm_max;
@@ -125,8 +127,8 @@ static int calc_speed_pwm_debug(float goal, float comp)
     {
         if (final_pwm < 0)
             final_pwm = 0;
-        else if (final_pwm > 0 && final_pwm < speed_pwm_min)
-            final_pwm = speed_pwm_min;
+        else if (final_pwm > 0 && final_pwm < min_pwm)
+            final_pwm = min_pwm;
     }
 
     return final_pwm;
@@ -260,94 +262,158 @@ void motor_control()
         static int started = 0;
         static int cnt = 0;
         static int sample_count = 0;
-        static int sign_changes = 0;
-        static float last_error = 0.0f;
-        static float sum_error = 0.0f;
-        static float sum_abs_error = 0.0f;
-        static float max_abs_error = 0.0f;
+        static int sign_changes_l = 0;
+        static int sign_changes_r = 0;
+        static float last_error_l = 0.0f;
+        static float last_error_r = 0.0f;
+        static float sum_error_l = 0.0f;
+        static float sum_error_r = 0.0f;
+        static float sum_abs_error_l = 0.0f;
+        static float sum_abs_error_r = 0.0f;
+        static float max_abs_error_l = 0.0f;
+        static float max_abs_error_r = 0.0f;
 
         if (!started)
         {
             reset_speed_pid_state();
-            setup_speed_test_target();
+            diff_speedl_expect = test_speed;
+            diff_speedr_expect = test_speed;
+            speed_goal_l = (float)diff_speedl_expect;
+            speed_goal_r = (float)diff_speedr_expect;
 
-            speed_p_l = 1.2f;
+            speed_p_l = 0.9f;
             speed_i_l = 0.02f;
-            speed_d_l = 0.35f;
-            speed_p_r = 1.2f;
+            speed_d_l = 0.08f;
+            speed_p_r = 0.9f;
             speed_i_r = 0.02f;
-            speed_d_r = 0.35f;
+            speed_d_r = 0.08f;
 
             cnt = 0;
             sample_count = 0;
-            sign_changes = 0;
-            last_error = 0.0f;
-            sum_error = 0.0f;
-            sum_abs_error = 0.0f;
-            max_abs_error = 0.0f;
+            sign_changes_l = 0;
+            sign_changes_r = 0;
+            last_error_l = 0.0f;
+            last_error_r = 0.0f;
+            sum_error_l = 0.0f;
+            sum_error_r = 0.0f;
+            sum_abs_error_l = 0.0f;
+            sum_abs_error_r = 0.0f;
+            max_abs_error_l = 0.0f;
+            max_abs_error_r = 0.0f;
             started = 1;
 
-            printf("[MODE5] AI PID assist | wheel=%d target L=%d R=%d\r\n",
-                   test_wheel, diff_speedl_expect, diff_speedr_expect);
+            printf("[MODE5] Auto tune both wheels | target L=%d R=%d\r\n",
+                   diff_speedl_expect, diff_speedr_expect);
         }
 
         motor_pid_left();
         motor_pid_right();
 
-        float active_error = (test_wheel == 2) ? speed_error_r : speed_error_l;
-        float active_abs_error = abs_float(active_error);
+        float abs_error_l = abs_float(speed_error_l);
+        float abs_error_r = abs_float(speed_error_r);
 
-        if (sample_count > 0 && ((active_error > 0.0f && last_error < 0.0f) ||
-                                 (active_error < 0.0f && last_error > 0.0f)))
+        if (sample_count > 0 && ((speed_error_l > 0.0f && last_error_l < 0.0f) ||
+                                 (speed_error_l < 0.0f && last_error_l > 0.0f)))
         {
-            sign_changes++;
+            sign_changes_l++;
+        }
+        if (sample_count > 0 && ((speed_error_r > 0.0f && last_error_r < 0.0f) ||
+                                 (speed_error_r < 0.0f && last_error_r > 0.0f)))
+        {
+            sign_changes_r++;
         }
 
-        last_error = active_error;
-        sum_error += active_error;
-        sum_abs_error += active_abs_error;
-        if (active_abs_error > max_abs_error)
-            max_abs_error = active_abs_error;
+        last_error_l = speed_error_l;
+        last_error_r = speed_error_r;
+        sum_error_l += speed_error_l;
+        sum_error_r += speed_error_r;
+        sum_abs_error_l += abs_error_l;
+        sum_abs_error_r += abs_error_r;
+        if (abs_error_l > max_abs_error_l)
+            max_abs_error_l = abs_error_l;
+        if (abs_error_r > max_abs_error_r)
+            max_abs_error_r = abs_error_r;
+
         sample_count++;
 
         if (++cnt % 25 == 0)
         {
-            float avg_error = sum_error / (float)sample_count;
-            float avg_abs_error = sum_abs_error / (float)sample_count;
+            float avg_error_l = sum_error_l / (float)sample_count;
+            float avg_error_r = sum_error_r / (float)sample_count;
+            float avg_abs_error_l = sum_abs_error_l / (float)sample_count;
+            float avg_abs_error_r = sum_abs_error_r / (float)sample_count;
 
-            if (avg_error > 8.0f)
-                speed_pwm_feedforward = clamp_float(speed_pwm_feedforward + 0.5f, 6.0f, 22.0f);
-            else if (avg_error < -8.0f)
-                speed_pwm_feedforward = clamp_float(speed_pwm_feedforward - 0.5f, 6.0f, 22.0f);
-
-            if (sign_changes > 8 || max_abs_error > 80.0f)
+            if (avg_error_l > 6.0f)
             {
-                speed_p_l = clamp_float(speed_p_l * 0.9f, 0.4f, 4.0f);
-                speed_p_r = clamp_float(speed_p_r * 0.9f, 0.4f, 4.0f);
-                speed_d_l = clamp_float(speed_d_l * 0.9f, 0.0f, 1.5f);
-                speed_d_r = clamp_float(speed_d_r * 0.9f, 0.0f, 1.5f);
+                speed_pwm_min_l += 25;
+                speed_pwm_feedforward_l = clamp_float(speed_pwm_feedforward_l + 0.3f, 4.0f, 24.0f);
             }
-            else if (avg_abs_error > 18.0f && sign_changes <= 4)
+            else if (avg_error_l < -6.0f)
             {
-                speed_p_l = clamp_float(speed_p_l + 0.1f, 0.4f, 4.0f);
-                speed_p_r = clamp_float(speed_p_r + 0.1f, 0.4f, 4.0f);
+                speed_pwm_min_l -= 25;
+                speed_pwm_feedforward_l = clamp_float(speed_pwm_feedforward_l - 0.3f, 4.0f, 24.0f);
             }
 
-            printf("[AI PID] avg=%.1f abs=%.1f max=%.1f cross=%d | P=%.2f I=%.3f D=%.2f FF=%.1f MIN=%d\r\n",
-                   avg_error, avg_abs_error, max_abs_error, sign_changes,
-                   speed_p_l, speed_i_l, speed_d_l, speed_pwm_feedforward, speed_pwm_min);
+            if (avg_error_r > 6.0f)
+            {
+                speed_pwm_min_r += 25;
+                speed_pwm_feedforward_r = clamp_float(speed_pwm_feedforward_r + 0.3f, 4.0f, 24.0f);
+            }
+            else if (avg_error_r < -6.0f)
+            {
+                speed_pwm_min_r -= 25;
+                speed_pwm_feedforward_r = clamp_float(speed_pwm_feedforward_r - 0.3f, 4.0f, 24.0f);
+            }
+
+            speed_pwm_min_l = (int)clamp_float((float)speed_pwm_min_l, 450.0f, 1300.0f);
+            speed_pwm_min_r = (int)clamp_float((float)speed_pwm_min_r, 450.0f, 1300.0f);
+
+            if (sign_changes_l > 6 || max_abs_error_l > 80.0f)
+            {
+                speed_p_l = clamp_float(speed_p_l * 0.9f, 0.35f, 4.0f);
+                speed_d_l = clamp_float(speed_d_l * 0.85f, 0.0f, 1.2f);
+            }
+            else if (avg_abs_error_l > 12.0f && sign_changes_l <= 3)
+            {
+                speed_p_l = clamp_float(speed_p_l + 0.08f, 0.35f, 4.0f);
+                speed_d_l = clamp_float(speed_d_l + 0.02f, 0.0f, 1.2f);
+            }
+
+            if (sign_changes_r > 6 || max_abs_error_r > 80.0f)
+            {
+                speed_p_r = clamp_float(speed_p_r * 0.9f, 0.35f, 4.0f);
+                speed_d_r = clamp_float(speed_d_r * 0.85f, 0.0f, 1.2f);
+            }
+            else if (avg_abs_error_r > 12.0f && sign_changes_r <= 3)
+            {
+                speed_p_r = clamp_float(speed_p_r + 0.08f, 0.35f, 4.0f);
+                speed_d_r = clamp_float(speed_d_r + 0.02f, 0.0f, 1.2f);
+            }
+
+            printf("[AI PID L] avg=%.1f abs=%.1f max=%.1f cross=%d | P=%.2f I=%.3f D=%.2f FF=%.1f MIN=%d\r\n",
+                   avg_error_l, avg_abs_error_l, max_abs_error_l, sign_changes_l,
+                   speed_p_l, speed_i_l, speed_d_l, speed_pwm_feedforward_l, speed_pwm_min_l);
+            printf("[AI PID R] avg=%.1f abs=%.1f max=%.1f cross=%d | P=%.2f I=%.3f D=%.2f FF=%.1f MIN=%d\r\n",
+                   avg_error_r, avg_abs_error_r, max_abs_error_r, sign_changes_r,
+                   speed_p_r, speed_i_r, speed_d_r, speed_pwm_feedforward_r, speed_pwm_min_r);
 
             sample_count = 0;
-            sign_changes = 0;
-            sum_error = 0.0f;
-            sum_abs_error = 0.0f;
-            max_abs_error = 0.0f;
+            sign_changes_l = 0;
+            sign_changes_r = 0;
+            sum_error_l = 0.0f;
+            sum_error_r = 0.0f;
+            sum_abs_error_l = 0.0f;
+            sum_abs_error_r = 0.0f;
+            max_abs_error_l = 0.0f;
+            max_abs_error_r = 0.0f;
         }
 
         if (cnt % 10 == 0)
         {
-            int final_pwm_l_debug = calc_speed_pwm_debug(speed_goal_l, speed_pid_out_l);
-            int final_pwm_r_debug = calc_speed_pwm_debug(speed_goal_r, speed_pid_out_r);
+            int final_pwm_l_debug = calc_speed_pwm_debug(speed_goal_l, speed_pid_out_l,
+                                                         speed_pwm_feedforward_l, speed_pwm_min_l);
+            int final_pwm_r_debug = calc_speed_pwm_debug(speed_goal_r, speed_pid_out_r,
+                                                         speed_pwm_feedforward_r, speed_pwm_min_r);
 
             printf("AI L target=%d speed=%d err=%.1f comp=%.1f pwm=%d | R target=%d speed=%d err=%.1f comp=%.1f pwm=%d\r\n",
                    diff_speedl_expect, encoderA_count, speed_error_l, speed_pid_out_l, final_pwm_l_debug,
@@ -386,28 +452,10 @@ void motor_control()
 
         if (++cnt % 10 == 0)
         {
-            int final_pwm_l_debug = (int)(speed_goal_l * speed_pwm_feedforward + speed_pid_out_l);
-            int final_pwm_r_debug = (int)(speed_goal_r * speed_pwm_feedforward + speed_pid_out_r);
-
-            if (speed_goal_l == 0.0f)
-                final_pwm_l_debug = 0;
-            else if (speed_goal_l > 0.0f)
-            {
-                if (final_pwm_l_debug < 0)
-                    final_pwm_l_debug = 0;
-                else if (final_pwm_l_debug > 0 && final_pwm_l_debug < speed_pwm_min)
-                    final_pwm_l_debug = speed_pwm_min;
-            }
-
-            if (speed_goal_r == 0.0f)
-                final_pwm_r_debug = 0;
-            else if (speed_goal_r > 0.0f)
-            {
-                if (final_pwm_r_debug < 0)
-                    final_pwm_r_debug = 0;
-                else if (final_pwm_r_debug > 0 && final_pwm_r_debug < speed_pwm_min)
-                    final_pwm_r_debug = speed_pwm_min;
-            }
+            int final_pwm_l_debug = calc_speed_pwm_debug(speed_goal_l, speed_pid_out_l,
+                                                         speed_pwm_feedforward_l, speed_pwm_min_l);
+            int final_pwm_r_debug = calc_speed_pwm_debug(speed_goal_r, speed_pid_out_r,
+                                                         speed_pwm_feedforward_r, speed_pwm_min_r);
 
             printf("L target=%d speed=%d err=%.1f comp=%.1f pwm=%d | R target=%d speed=%d err=%.1f comp=%.1f pwm=%d\r\n",
                    diff_speedl_expect, encoderA_count, speed_error_l, speed_pid_out_l,
@@ -510,7 +558,7 @@ void motor_pid_left()
         speed_pid_out_l = pwm_min;
 
     // 左轮输出
-    int final_pwm_l = (int)(speed_goal_l * speed_pwm_feedforward + speed_pid_out_l);
+    int final_pwm_l = (int)(speed_goal_l * speed_pwm_feedforward_l + speed_pid_out_l);
     if (final_pwm_l > pwm_max)
         final_pwm_l = pwm_max;
     if (final_pwm_l < pwm_min)
@@ -521,8 +569,8 @@ void motor_pid_left()
     {
         if (final_pwm_l < 0)
             final_pwm_l = 0;
-        else if (final_pwm_l > 0 && final_pwm_l < speed_pwm_min)
-            final_pwm_l = speed_pwm_min;
+        else if (final_pwm_l > 0 && final_pwm_l < speed_pwm_min_l)
+            final_pwm_l = speed_pwm_min_l;
     }
 
     if (final_pwm_l >= 0)
@@ -569,7 +617,7 @@ void motor_pid_right()
         speed_pid_out_r = pwm_min;
 
     // 右轮输出
-    int final_pwm_r = (int)(speed_goal_r * speed_pwm_feedforward + speed_pid_out_r);
+    int final_pwm_r = (int)(speed_goal_r * speed_pwm_feedforward_r + speed_pid_out_r);
     if (final_pwm_r > pwm_max)
         final_pwm_r = pwm_max;
     if (final_pwm_r < pwm_min)
@@ -580,8 +628,8 @@ void motor_pid_right()
     {
         if (final_pwm_r < 0)
             final_pwm_r = 0;
-        else if (final_pwm_r > 0 && final_pwm_r < speed_pwm_min)
-            final_pwm_r = speed_pwm_min;
+        else if (final_pwm_r > 0 && final_pwm_r < speed_pwm_min_r)
+            final_pwm_r = speed_pwm_min_r;
     }
 
     if (final_pwm_r < 0)
