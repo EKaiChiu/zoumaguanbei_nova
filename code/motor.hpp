@@ -15,6 +15,9 @@
 extern zf_driver_pwm motor1_pwm_1;   // 添加这行
 extern zf_driver_pwm motor2_pwm_2;   // 添加这行
 
+extern int test_mode;
+extern int mode2_pwm;
+
 void encoder_test();
 
 void motor_argument();

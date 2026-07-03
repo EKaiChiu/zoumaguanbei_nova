@@ -34,6 +34,7 @@ static float speed_dout_filtered_r = 1.0f;
 
 // 测试模式：0=寻迹, 1=速度测试, 2=固定PWM, 3=编码器观察, 4=映射验证
 int test_mode = 2;
+int mode2_pwm = 1200;
 
 int pwm_max = 3500, pwm_min = -3500; // PWM限幅（duty=800对应8%占空比）
 
@@ -147,13 +148,13 @@ void motor_control()
         static int cnt = 0;
         if (cnt < 1)
         {
-            printf("[MODE2] Fixed PWM L=R=duty(1200) -> expect ~150 pulse/cycle\r\n");
+            printf("[MODE2] Fixed PWM L=R=duty(%d)\r\n", mode2_pwm);
             cnt++;
         }
         motor1_gpio.set_level(0);
-        motor1_pwm_1.set_duty(1200);
+        motor1_pwm_1.set_duty(mode2_pwm);
         motor2_gpio.set_level(0);
-        motor2_pwm_2.set_duty(1200);
+        motor2_pwm_2.set_duty(mode2_pwm);
         static int print_cnt = 0;
         if (++print_cnt >= 20)
         {

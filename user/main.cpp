@@ -41,6 +41,7 @@
 #include "config.hpp"
 #include "ips200_draw.hpp"
 #include "red_detect.hpp"
+#include "menu.hpp"
 
 // ====================== 网络配置宏定义 ======================
 #define SERVER_IP "10.18.55.68" // TCP服务端IP地址（电脑IP，需手动修改）
@@ -211,6 +212,7 @@ int main()
         }
 
         ImageProcess();
+        Menu_Process();
 
         if (first_frame)
         {
@@ -265,6 +267,7 @@ int main()
 
             // 步骤3: 刷新整个IPS200屏幕（居中显示160×120）
             ips200.show_rgb565_image(80, 60, screen_buf[0], 160, 120, 160, 120, 0);
+            Menu_Draw();
         }
 
         // ========== 第二部分：逐飞助手图传数据准备（优化：每3帧刷新一次）==========
