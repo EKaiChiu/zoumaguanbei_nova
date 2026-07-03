@@ -33,7 +33,7 @@ float speed_last_error_r;
 static float speed_dout_filtered_r = 1.0f;
 
 // 测试模式：0=寻迹, 1=速度测试, 2=固定PWM, 3=编码器观察, 4=映射验证
-int test_mode = 2;
+int test_mode = 3;
 int mode2_pwm = 1200;
 
 int pwm_max = 3500, pwm_min = -3500; // PWM限幅（duty=800对应8%占空比）
@@ -54,6 +54,21 @@ float y, x;
 // 测试参数
 int test_wheel = 1;  // 测试轮选择
 int test_speed = 60; // 测试目标速度
+
+static void reset_speed_pid_state()
+{
+    speed_error_l = 0;
+    speed_integral_l = 0;
+    speed_last_error_l = 0;
+    speed_pid_out_l = 0;
+    speed_dout_filtered_l = 0;
+
+    speed_error_r = 0;
+    speed_integral_r = 0;
+    speed_last_error_r = 0;
+    speed_pid_out_r = 0;
+    speed_dout_filtered_r = 0;
+}
 
 void motor_argument()
 {
@@ -79,6 +94,13 @@ void debug_print_centers();
 
 void motor_control()
 {
+    static int last_test_mode = -1;
+    if (test_mode != last_test_mode)
+    {
+        reset_speed_pid_state();
+        last_test_mode = test_mode;
+    }
+
     // ════════════════════════════════════════════════
     // 1. 获取编码器数据（速度闭环：读完后清零！）
     // ════════════════════════════════════════════════
@@ -174,8 +196,7 @@ void motor_control()
 
         if (!started)
         {
-            speed_pid_out_l = 20;
-            speed_pid_out_r = 20;
+            reset_speed_pid_state();
             started = 1;
 
             // 在这里调整PID参数
@@ -185,8 +206,6 @@ void motor_control()
             speed_p_r = 1.2f;
             speed_i_r = 0.05f;
             speed_d_r = 0.8f;
-
-            int test_speed = 60;
 
             if (test_wheel == 1)
             {
@@ -203,6 +222,12 @@ void motor_control()
                 diff_speedl_expect = test_speed;
                 diff_speedr_expect = test_speed;
             }
+
+            speed_goal_l = (float)diff_speedl_expect;
+            speed_goal_r = (float)diff_speedr_expect;
+
+            printf("[MODE3] Speed PID test | wheel=%d | L=%d R=%d\r\n",
+                   test_wheel, diff_speedl_expect, diff_speedr_expect);
         }
 
         motor_pid_left();
@@ -312,6 +337,8 @@ void motor_pid_left()
         final_pwm_l = pwm_max;
     if (final_pwm_l < pwm_min)
         final_pwm_l = pwm_min;
+    if (speed_goal_l == 0.0f)
+        final_pwm_l = 0;
     if (final_pwm_l > 0 && final_pwm_l < 1200)
         final_pwm_l = 1200; // 正向最小 600
     if (final_pwm_l < 0 && final_pwm_l > -1200)
@@ -366,6 +393,8 @@ void motor_pid_right()
         final_pwm_r = pwm_max;
     if (final_pwm_r < pwm_min)
         final_pwm_r = pwm_min;
+    if (speed_goal_r == 0.0f)
+        final_pwm_r = 0;
     if (final_pwm_r > 0 && final_pwm_r < 1200)
         final_pwm_r = 1200; // 正向最小 600
     if (final_pwm_r < 0 && final_pwm_r > -1200)

@@ -16,7 +16,7 @@ typedef enum
 } MenuPage;
 
 static MenuPage menu_page = MENU_PAGE_MODE;
-static int selected_mode = 2;
+static int selected_mode = 3;
 
 static int clamp_int(int value, int min_value, int max_value)
 {
