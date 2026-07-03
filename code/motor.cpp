@@ -33,7 +33,7 @@ float speed_last_error_r;
 static float speed_dout_filtered_r = 1.0f;
 
 // 测试模式：0=寻迹, 1=速度测试, 2=固定PWM, 3=编码器观察, 4=映射验证
-int test_mode = 3;
+int test_mode = 5;
 int mode2_pwm = 1200;
 
 int pwm_max = 3500, pwm_min = -3500; // PWM限幅（duty=800对应8%占空比）
