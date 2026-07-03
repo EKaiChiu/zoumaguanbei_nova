@@ -139,7 +139,6 @@ void motor_control()
         printf("L:%d | R:%d\r\n", encoderA_count, encoderB_count);
         return;
     }
-    pit_timer.init_ms(20, motor_control);
     // ════════════════════════════════════════════════
     // 模式2：固定PWM直行（硬件方向测试）
     // ════════════════════════════════════════════════
