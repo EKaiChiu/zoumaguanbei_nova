@@ -55,6 +55,9 @@ float y, x;
 int test_wheel = 1;  // 测试轮选择
 int test_speed = 60; // 测试目标速度
 
+int speed_pwm_min = 250;
+float speed_pwm_feedforward = 4.0f;
+
 static void reset_speed_pid_state()
 {
     speed_error_l = 0;
@@ -338,17 +341,20 @@ void motor_pid_left()
         speed_pid_out_l = pwm_min;
 
     // 左轮输出
-    int final_pwm_l = (int)speed_pid_out_l;
+    int final_pwm_l = (int)(speed_goal_l * speed_pwm_feedforward + speed_pid_out_l);
     if (final_pwm_l > pwm_max)
         final_pwm_l = pwm_max;
     if (final_pwm_l < pwm_min)
         final_pwm_l = pwm_min;
     if (speed_goal_l == 0.0f)
         final_pwm_l = 0;
-    if (final_pwm_l > 0 && final_pwm_l < 1200)
-        final_pwm_l = 1200; // 正向最小 600
-    if (final_pwm_l < 0 && final_pwm_l > -1200)
-        final_pwm_l = -1200; // 反向最小 -600
+    else if (speed_goal_l > 0.0f)
+    {
+        if (final_pwm_l < 0)
+            final_pwm_l = 0;
+        else if (final_pwm_l > 0 && final_pwm_l < speed_pwm_min)
+            final_pwm_l = speed_pwm_min;
+    }
 
     if (final_pwm_l >= 0)
     {
@@ -394,17 +400,20 @@ void motor_pid_right()
         speed_pid_out_r = pwm_min;
 
     // 右轮输出
-    int final_pwm_r = (int)speed_pid_out_r;
+    int final_pwm_r = (int)(speed_goal_r * speed_pwm_feedforward + speed_pid_out_r);
     if (final_pwm_r > pwm_max)
         final_pwm_r = pwm_max;
     if (final_pwm_r < pwm_min)
         final_pwm_r = pwm_min;
     if (speed_goal_r == 0.0f)
         final_pwm_r = 0;
-    if (final_pwm_r > 0 && final_pwm_r < 1200)
-        final_pwm_r = 1200; // 正向最小 600
-    if (final_pwm_r < 0 && final_pwm_r > -1200)
-        final_pwm_r = -1200; // 反向最小 -600
+    else if (speed_goal_r > 0.0f)
+    {
+        if (final_pwm_r < 0)
+            final_pwm_r = 0;
+        else if (final_pwm_r > 0 && final_pwm_r < speed_pwm_min)
+            final_pwm_r = speed_pwm_min;
+    }
 
     if (final_pwm_r < 0)
     {
