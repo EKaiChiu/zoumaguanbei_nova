@@ -1,5 +1,5 @@
 #include "motor.hpp"
-
+#include "config.hpp"
 zf_driver_gpio motor1_gpio(motor1_dir, O_RDWR);
 zf_driver_gpio motor2_gpio(motor2_dir, O_RDWR);
 
@@ -33,7 +33,7 @@ float speed_last_error_r;
 static float speed_dout_filtered_r = 1.0f;
 
 // 测试模式：0=寻迹, 1=速度测试, 2=固定PWM, 3=编码器观察, 4=映射验证
-int test_mode = 0;
+int test_mode = 2;
 
 int pwm_max = 3500, pwm_min = -3500; // PWM限幅（duty=800对应8%占空比）
 
@@ -126,20 +126,20 @@ void motor_control()
     }
 
     // ════════════════════════════════════════════════
-    // 模式3：编码器裸数据验证（不转电机）
+    // 模式1：编码器正反观察
     // ════════════════════════════════════════════════
-    if (test_mode == 3)
+    if (test_mode == 1)
     {
         static int cnt = 0;
         if (cnt < 3)
         {
-            printf("[MODE3] Encoder raw data === Don't move! ===\r\n");
+            printf("[MODE1] Encoder raw data === Don't move! ===\r\n");
             cnt++;
         }
         printf("L:%d | R:%d\r\n", encoderA_count, encoderB_count);
         return;
     }
-
+    pit_timer.init_ms(20, motor_control);
     // ════════════════════════════════════════════════
     // 模式2：固定PWM直行（硬件方向测试）
     // ════════════════════════════════════════════════
@@ -155,14 +155,19 @@ void motor_control()
         motor1_pwm_1.set_duty(1200);
         motor2_gpio.set_level(0);
         motor2_pwm_2.set_duty(1200);
-        printf("%d %d\r\n", encoderA_count, encoderB_count);
+        static int print_cnt = 0;
+        if (++print_cnt >= 20)
+        {
+            print_cnt = 0;
+            printf("L:%d R:%d\r\n", encoderA_count, encoderB_count);
+        }
         return;
     }
 
     // ════════════════════════════════════════════════
-    // 模式1：速度PID测试（单独测左/右轮）
+    // 模式3：速度PID测试（单独测左/右轮）
     // ════════════════════════════════════════════════
-    if (test_mode == 1)
+    if (test_mode == 3)
     {
         static int started = 0;
         static int cnt = 0;

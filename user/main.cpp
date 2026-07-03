@@ -38,6 +38,7 @@
 #include "zf_driver_pwm.hpp"
 #include "init.hpp"
 #include "image.hpp"
+#include "config.hpp"
 #include "ips200_draw.hpp"
 #include "red_detect.hpp"
 

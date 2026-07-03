@@ -289,5 +289,5 @@ void color_detect(uint16 *rgb_image)
     int g = g6 * 255 / 63;
     int b = b5 * 255 / 31;
 
-    printf("bottom-center pixel(%d,%d) RGB: R=%d G=%d B=%d\r\n", x, y, r, g, b);
+    //printf("bottom-center pixel(%d,%d) RGB: R=%d G=%d B=%d\r\n", x, y, r, g, b);
 }

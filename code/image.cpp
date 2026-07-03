@@ -57,7 +57,7 @@ float my_abs(float x)
     return x;
 }
 
-// 图像压缩：将OpenCV的Mat图像复制到自定义数组中（2倍下采样 160×120 → 80×60）
+// 图像压缩(160×120 → 80×60）
 void compressimage()
 {
     // 1. 等待新图像
@@ -1061,8 +1061,8 @@ void Search_Border_OTSU(uint8 imageInput[LCDH][LCDW], uint8 Row, uint8 Col, uint
 // 左环岛判断
 void Element_Judgment_Left_Rings()
 {
-    printf("Left_Line:%d,Right_Line:%d\n", ImageStatus.Left_Line, ImageStatus.Right_Line);
-    //    Disf = 0;
+    // printf("Left_Line:%d,Right_Line:%d\n", ImageStatus.Left_Line, ImageStatus.Right_Line);
+    //     Disf = 0;
     if (ImageStatus.Right_Line > 2 || ImageStatus.Left_Line < 20 // 13
         || ImageStatus.OFFLine > 2
         //  ||variance_acc>20
