@@ -111,6 +111,10 @@ void motor_control()
     encoder_dir_1.clear_count(); // 清零！
 
     // ✅ 关键：同步差速环目标到PID目标（仅在寻迹模式）
+    int16 encoder_swap_temp = encoderA_count;
+    encoderA_count = encoderB_count;
+    encoderB_count = encoder_swap_temp;
+
     if (test_mode == 0)
     {
         speed_goal_l = (float)diff_speedl_expect;
