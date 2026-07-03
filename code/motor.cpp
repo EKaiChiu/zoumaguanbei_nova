@@ -73,6 +73,65 @@ static void reset_speed_pid_state()
     speed_dout_filtered_r = 0;
 }
 
+static float abs_float(float value)
+{
+    return value < 0.0f ? -value : value;
+}
+
+static float clamp_float(float value, float min_value, float max_value)
+{
+    if (value < min_value)
+        return min_value;
+    if (value > max_value)
+        return max_value;
+    return value;
+}
+
+static void setup_speed_test_target()
+{
+    if (test_wheel == 1)
+    {
+        diff_speedl_expect = test_speed;
+        diff_speedr_expect = 0;
+    }
+    else if (test_wheel == 2)
+    {
+        diff_speedl_expect = 0;
+        diff_speedr_expect = test_speed;
+    }
+    else
+    {
+        diff_speedl_expect = test_speed;
+        diff_speedr_expect = test_speed;
+    }
+
+    speed_goal_l = (float)diff_speedl_expect;
+    speed_goal_r = (float)diff_speedr_expect;
+}
+
+static int calc_speed_pwm_debug(float goal, float comp)
+{
+    int final_pwm = (int)(goal * speed_pwm_feedforward + comp);
+
+    if (final_pwm > pwm_max)
+        final_pwm = pwm_max;
+    if (final_pwm < pwm_min)
+        final_pwm = pwm_min;
+
+    if (goal == 0.0f)
+        return 0;
+
+    if (goal > 0.0f)
+    {
+        if (final_pwm < 0)
+            final_pwm = 0;
+        else if (final_pwm > 0 && final_pwm < speed_pwm_min)
+            final_pwm = speed_pwm_min;
+    }
+
+    return final_pwm;
+}
+
 void motor_argument()
 {
     // ✅ 慢速目标：100 pulse/周期（对应duty≈800，8%占空比）
@@ -196,6 +255,108 @@ void motor_control()
     // ════════════════════════════════════════════════
     // 模式3：速度PID测试（单独测左/右轮）
     // ════════════════════════════════════════════════
+    if (test_mode == 5)
+    {
+        static int started = 0;
+        static int cnt = 0;
+        static int sample_count = 0;
+        static int sign_changes = 0;
+        static float last_error = 0.0f;
+        static float sum_error = 0.0f;
+        static float sum_abs_error = 0.0f;
+        static float max_abs_error = 0.0f;
+
+        if (!started)
+        {
+            reset_speed_pid_state();
+            setup_speed_test_target();
+
+            speed_p_l = 1.2f;
+            speed_i_l = 0.02f;
+            speed_d_l = 0.35f;
+            speed_p_r = 1.2f;
+            speed_i_r = 0.02f;
+            speed_d_r = 0.35f;
+
+            cnt = 0;
+            sample_count = 0;
+            sign_changes = 0;
+            last_error = 0.0f;
+            sum_error = 0.0f;
+            sum_abs_error = 0.0f;
+            max_abs_error = 0.0f;
+            started = 1;
+
+            printf("[MODE5] AI PID assist | wheel=%d target L=%d R=%d\r\n",
+                   test_wheel, diff_speedl_expect, diff_speedr_expect);
+        }
+
+        motor_pid_left();
+        motor_pid_right();
+
+        float active_error = (test_wheel == 2) ? speed_error_r : speed_error_l;
+        float active_abs_error = abs_float(active_error);
+
+        if (sample_count > 0 && ((active_error > 0.0f && last_error < 0.0f) ||
+                                 (active_error < 0.0f && last_error > 0.0f)))
+        {
+            sign_changes++;
+        }
+
+        last_error = active_error;
+        sum_error += active_error;
+        sum_abs_error += active_abs_error;
+        if (active_abs_error > max_abs_error)
+            max_abs_error = active_abs_error;
+        sample_count++;
+
+        if (++cnt % 25 == 0)
+        {
+            float avg_error = sum_error / (float)sample_count;
+            float avg_abs_error = sum_abs_error / (float)sample_count;
+
+            if (avg_error > 8.0f)
+                speed_pwm_feedforward = clamp_float(speed_pwm_feedforward + 0.5f, 6.0f, 22.0f);
+            else if (avg_error < -8.0f)
+                speed_pwm_feedforward = clamp_float(speed_pwm_feedforward - 0.5f, 6.0f, 22.0f);
+
+            if (sign_changes > 8 || max_abs_error > 80.0f)
+            {
+                speed_p_l = clamp_float(speed_p_l * 0.9f, 0.4f, 4.0f);
+                speed_p_r = clamp_float(speed_p_r * 0.9f, 0.4f, 4.0f);
+                speed_d_l = clamp_float(speed_d_l * 0.9f, 0.0f, 1.5f);
+                speed_d_r = clamp_float(speed_d_r * 0.9f, 0.0f, 1.5f);
+            }
+            else if (avg_abs_error > 18.0f && sign_changes <= 4)
+            {
+                speed_p_l = clamp_float(speed_p_l + 0.1f, 0.4f, 4.0f);
+                speed_p_r = clamp_float(speed_p_r + 0.1f, 0.4f, 4.0f);
+            }
+
+            printf("[AI PID] avg=%.1f abs=%.1f max=%.1f cross=%d | P=%.2f I=%.3f D=%.2f FF=%.1f MIN=%d\r\n",
+                   avg_error, avg_abs_error, max_abs_error, sign_changes,
+                   speed_p_l, speed_i_l, speed_d_l, speed_pwm_feedforward, speed_pwm_min);
+
+            sample_count = 0;
+            sign_changes = 0;
+            sum_error = 0.0f;
+            sum_abs_error = 0.0f;
+            max_abs_error = 0.0f;
+        }
+
+        if (cnt % 10 == 0)
+        {
+            int final_pwm_l_debug = calc_speed_pwm_debug(speed_goal_l, speed_pid_out_l);
+            int final_pwm_r_debug = calc_speed_pwm_debug(speed_goal_r, speed_pid_out_r);
+
+            printf("AI L target=%d speed=%d err=%.1f comp=%.1f pwm=%d | R target=%d speed=%d err=%.1f comp=%.1f pwm=%d\r\n",
+                   diff_speedl_expect, encoderA_count, speed_error_l, speed_pid_out_l, final_pwm_l_debug,
+                   diff_speedr_expect, encoderB_count, speed_error_r, speed_pid_out_r, final_pwm_r_debug);
+        }
+
+        return;
+    }
+
     if (test_mode == 3)
     {
         static int started = 0;
@@ -214,24 +375,7 @@ void motor_control()
             speed_i_r = 0.05f;
             speed_d_r = 0.8f;
 
-            if (test_wheel == 1)
-            {
-                diff_speedl_expect = test_speed;
-                diff_speedr_expect = 0;
-            }
-            else if (test_wheel == 2)
-            {
-                diff_speedl_expect = 0;
-                diff_speedr_expect = test_speed;
-            }
-            else
-            {
-                diff_speedl_expect = test_speed;
-                diff_speedr_expect = test_speed;
-            }
-
-            speed_goal_l = (float)diff_speedl_expect;
-            speed_goal_r = (float)diff_speedr_expect;
+            setup_speed_test_target();
 
             printf("[MODE3] Speed PID test | wheel=%d | L=%d R=%d\r\n",
                    test_wheel, diff_speedl_expect, diff_speedr_expect);

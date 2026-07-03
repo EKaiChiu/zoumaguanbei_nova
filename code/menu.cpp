@@ -4,7 +4,7 @@
 #include "motor.hpp"
 
 #define MENU_MODE_MIN 0
-#define MENU_MODE_MAX 4
+#define MENU_MODE_MAX 5
 #define MENU_PWM_MIN 0
 #define MENU_PWM_MAX 3500
 #define MENU_PWM_STEP 100
