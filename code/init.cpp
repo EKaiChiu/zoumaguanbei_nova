@@ -62,5 +62,5 @@ void init_all()
     // ⚠️ 定时器在这里初始化但先不启动！
     // 由 main.cpp 在第一帧图像处理完后调用 start_motor_timer()
     image_ready_flag = 0;  // 先禁用电机控制
-    pit_timer.init_ms(5, Interrupt);  // 注册中断回调（但flag=0不会执行）
+    pit_timer.init_ms(20, Interrupt);  // 注册中断回调（但flag=0不会执行）
 }
