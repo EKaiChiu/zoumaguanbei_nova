@@ -55,8 +55,8 @@ float y, x;
 int test_wheel = 1;  // 测试轮选择
 int test_speed = 60; // 测试目标速度
 
-int speed_pwm_min = 250;
-float speed_pwm_feedforward = 4.0f;
+int speed_pwm_min = 800;
+float speed_pwm_feedforward = 12.0f;
 
 static void reset_speed_pid_state()
 {
@@ -242,9 +242,34 @@ void motor_control()
 
         if (++cnt % 10 == 0)
         {
-            printf("L target=%d speed=%d err=%.1f comp=%.1f | R target=%d speed=%d err=%.1f comp=%.1f\r\n",
+            int final_pwm_l_debug = (int)(speed_goal_l * speed_pwm_feedforward + speed_pid_out_l);
+            int final_pwm_r_debug = (int)(speed_goal_r * speed_pwm_feedforward + speed_pid_out_r);
+
+            if (speed_goal_l == 0.0f)
+                final_pwm_l_debug = 0;
+            else if (speed_goal_l > 0.0f)
+            {
+                if (final_pwm_l_debug < 0)
+                    final_pwm_l_debug = 0;
+                else if (final_pwm_l_debug > 0 && final_pwm_l_debug < speed_pwm_min)
+                    final_pwm_l_debug = speed_pwm_min;
+            }
+
+            if (speed_goal_r == 0.0f)
+                final_pwm_r_debug = 0;
+            else if (speed_goal_r > 0.0f)
+            {
+                if (final_pwm_r_debug < 0)
+                    final_pwm_r_debug = 0;
+                else if (final_pwm_r_debug > 0 && final_pwm_r_debug < speed_pwm_min)
+                    final_pwm_r_debug = speed_pwm_min;
+            }
+
+            printf("L target=%d speed=%d err=%.1f comp=%.1f pwm=%d | R target=%d speed=%d err=%.1f comp=%.1f pwm=%d\r\n",
                    diff_speedl_expect, encoderA_count, speed_error_l, speed_pid_out_l,
-                   diff_speedr_expect, encoderB_count, speed_error_r, speed_pid_out_r);
+                   final_pwm_l_debug,
+                   diff_speedr_expect, encoderB_count, speed_error_r, speed_pid_out_r,
+                   final_pwm_r_debug);
         }
         return;
     }
