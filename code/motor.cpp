@@ -235,7 +235,9 @@ void motor_control()
 
         if (++cnt % 10 == 0)
         {
-            printf("L:%d/%d | R:%d/%d\r\n", diff_speedl_expect, encoderA_count, diff_speedr_expect, encoderB_count);
+            printf("L target=%d speed=%d err=%.1f comp=%.1f | R target=%d speed=%d err=%.1f comp=%.1f\r\n",
+                   diff_speedl_expect, encoderA_count, speed_error_l, speed_pid_out_l,
+                   diff_speedr_expect, encoderB_count, speed_error_r, speed_pid_out_r);
         }
         return;
     }
