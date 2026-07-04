@@ -1872,81 +1872,45 @@ void DrawLine()
 /*****************偏差按权重系数加权平均**********************/
 void GetDet()
 {
-    float DetTemp = 0;
-    int TowPoint = 0;
-    float SpeedGain = 0;
-    float UnitAll = 0;
+    float DetTemp = 0.0f;
+    float UnitAll = 0.0f;
+    const int det_start_row = 5;  // original row 10 after 2x compression
+    const int det_end_row = 55;   // original row 110 after 2x compression
+    const int det_mid_row = (det_start_row + det_end_row) / 2;
 
-    if ((ImageStatus.Road_type == RightCirque || ImageStatus.Road_type == LeftCirque) && ImageStatus.CirqueOff == 'F')
-        TowPoint = 30; // 环岛前瞻
+    int start_row = det_start_row;
+    if (start_row < 0)
+        start_row = 0;
 
-    else if (ImageStatus.Road_type == Straight)
-        TowPoint = SystemData.straighet_towpoint;
+    int end_row = det_end_row;
+    if (end_row >= LCDH)
+        end_row = LCDH - 1;
 
-    else if (ImageStatus.Road_type == Cross_ture)
+    if (start_row <= end_row)
     {
-        TowPoint = 22;
-    }
-    else if (ImageFlag.image_element_rings_flag == 1 || ImageFlag.image_element_rings_flag == 2)
-    {
-        TowPoint = 30;
+        for (int Ysite = start_row; Ysite <= end_row; Ysite++)
+        {
+            int distance = Ysite - det_mid_row;
+            if (distance < 0)
+                distance = -distance;
+
+            float weight = 1.0f - (float)distance / (float)(det_mid_row - det_start_row + 1);
+            if (weight < 0.15f)
+                weight = 0.15f;
+
+            DetTemp += weight * (float)ImageDeal[Ysite].Center;
+            UnitAll += weight;
+        }
+
+        DetTemp = DetTemp / UnitAll;
     }
     else
-        TowPoint = ImageStatus.TowPoint - SpeedGain; // 速度越快前瞻越大
-
-    if (TowPoint < ImageStatus.OFFLine)
-        TowPoint = ImageStatus.OFFLine + 1;
-
-    if (TowPoint >= 49)
-        TowPoint = 49;
-
-    // 限制前瞻点最大值为25（提前看远，早减速）
-    if (TowPoint > 25)
-        TowPoint = 25;
-
-    if ((TowPoint - 5) >= ImageStatus.OFFLine)
-    { // 前瞻取设定前瞻和视觉距离 取较小值
-        for (int Ysite = (TowPoint - 5); Ysite < TowPoint; Ysite++)
-        {
-            DetTemp = DetTemp + Weighting[TowPoint - Ysite - 1] * (ImageDeal[Ysite].Center);
-            UnitAll = UnitAll + Weighting[TowPoint - Ysite - 1];
-        }
-        for (Ysite = (TowPoint + 5); Ysite > TowPoint; Ysite--)
-        {
-            DetTemp += Weighting[-TowPoint + Ysite - 1] * (ImageDeal[Ysite].Center);
-            UnitAll += Weighting[-TowPoint + Ysite - 1];
-        }
-        DetTemp = (ImageDeal[TowPoint].Center + DetTemp) / (UnitAll + 1);
-    }
-    else if (TowPoint > ImageStatus.OFFLine)
     {
-        for (Ysite = ImageStatus.OFFLine; Ysite < TowPoint; Ysite++)
-        {
-            DetTemp += Weighting[TowPoint - Ysite - 1] * (ImageDeal[Ysite].Center);
-            UnitAll += Weighting[TowPoint - Ysite - 1];
-        }
-        for (Ysite = (TowPoint + TowPoint - ImageStatus.OFFLine); Ysite > TowPoint; Ysite--)
-        {
-            DetTemp += Weighting[-TowPoint + Ysite - 1] * (ImageDeal[Ysite].Center);
-            UnitAll += Weighting[-TowPoint + Ysite - 1];
-        }
-        DetTemp = (ImageDeal[Ysite].Center + DetTemp) / (UnitAll + 1);
+        DetTemp = ImageStatus.Det_True;
     }
-    else if (ImageStatus.OFFLine < 49)
-    {
-        for (Ysite = (ImageStatus.OFFLine + 3); Ysite > ImageStatus.OFFLine; Ysite--)
-        {
-            DetTemp += Weighting[-TowPoint + Ysite - 1] * (ImageDeal[Ysite].Center);
-            UnitAll += Weighting[-TowPoint + Ysite - 1];
-        }
-        DetTemp = (ImageDeal[ImageStatus.OFFLine].Center + DetTemp) / (UnitAll + 1);
-    }
-    else
-        DetTemp = ImageStatus.Det_True; // 如果出现OFFLine>50，那么保持上一次的偏差值
 
-    ImageStatus.Det_True = DetTemp; // 这时的计算结果作为平均图像偏差
-
-    ImageStatus.TowPoint_True = TowPoint; // 这时的前瞻
+    ImageStatus.Det_True = DetTemp;
+    ImageStatus.TowPoint_True = det_mid_row;
 }
 
 void FindLargestWhiteRegion(ROIRegionTypedef *roi)
