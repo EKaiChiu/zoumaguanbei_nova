@@ -369,6 +369,32 @@ void motor_control()
                        speed_p_r, speed_i_r, speed_d_r, speed_pwm_feedforward_r, speed_pwm_min_r);
             }
 
+            if (tune_locked && avg_error_l > 6.0f)
+            {
+                speed_pwm_min_l += 10;
+                speed_pwm_feedforward_l = clamp_float(speed_pwm_feedforward_l + 0.1f, 4.0f, 24.0f);
+                reset_speed_pid_state();
+            }
+            else if (tune_locked && avg_error_l < -6.0f)
+            {
+                speed_pwm_min_l -= 10;
+                speed_pwm_feedforward_l = clamp_float(speed_pwm_feedforward_l - 0.1f, 4.0f, 24.0f);
+                reset_speed_pid_state();
+            }
+
+            if (tune_locked && avg_error_r > 6.0f)
+            {
+                speed_pwm_min_r += 10;
+                speed_pwm_feedforward_r = clamp_float(speed_pwm_feedforward_r + 0.1f, 4.0f, 24.0f);
+                reset_speed_pid_state();
+            }
+            else if (tune_locked && avg_error_r < -6.0f)
+            {
+                speed_pwm_min_r -= 10;
+                speed_pwm_feedforward_r = clamp_float(speed_pwm_feedforward_r - 0.1f, 4.0f, 24.0f);
+                reset_speed_pid_state();
+            }
+
             if (!tune_locked && avg_error_l > 6.0f)
             {
                 speed_pwm_min_l += 25;
