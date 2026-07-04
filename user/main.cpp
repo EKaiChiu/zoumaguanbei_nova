@@ -227,6 +227,9 @@ int main()
                ImageStatus.Road_type);
 #endif
 
+        vision_get();
+        printf("vision_get() result: %d\n", vision_get());
+        vision_close();
         // ========== 红色目标检测==========
         static red_detect red_result;
         uint16_t *rgb_image = uvc_cam.get_rgb_image_ptr();
