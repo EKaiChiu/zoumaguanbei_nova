@@ -46,7 +46,7 @@
 // ====================== 网络配置宏定义 ======================
 #define SERVER_IP "10.18.55.68" // TCP服务端IP地址（电脑IP，需手动修改）
 #define PORT 8086               // TCP通信端口号
-#define IMAGE_TRANSFER_INTERVAL 1
+#define IMAGE_TRANSFER_INTERVAL 3
 
 // 调试开关：取消注释启用调试打印，正式运行时注释掉以提升性能
 // #define DEBUG_PRINT
@@ -101,6 +101,7 @@ int main()
 
     if (tcp_client.init(SERVER_IP, PORT) == 0)
     {
+        tcp_client.set_retry_param(1, 1);
         printf("tcp_client ok\r\n");
     }
     else

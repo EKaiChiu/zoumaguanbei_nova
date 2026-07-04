@@ -202,7 +202,11 @@ uint32 zf_driver_tcp_client::send_data(const uint8 *buff, uint32 length)
     // 检查是否全部发送完成
     if (total_sent < length)
     {
-        printf("send_data: max retry reached, sent %d/%d bytes\r\n", total_sent, length);
+        static uint32 fail_print_count = 0;
+        if ((fail_print_count++ % 50) == 0)
+        {
+            printf("send_data: max retry reached, sent %d/%d bytes\r\n", total_sent, length);
+        }
         return 0; // 未全部发送，返回失败
     }
 
