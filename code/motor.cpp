@@ -660,7 +660,7 @@ void motor_diff_pid1()
     last_turn_error = turn_error;
 
     // 转向限幅：允许急弯接近外侧正转、内侧反转，但避免D项尖峰过猛
-    float turn_limit = 190.0f;
+    float turn_limit = 160.0f;
     if (turn_output > turn_limit)
         turn_output = turn_limit;
     if (turn_output < -turn_limit)
