@@ -627,6 +627,13 @@ void motor_pid_left()
         else if (final_pwm_l > 0 && final_pwm_l < speed_pwm_min_l)
             final_pwm_l = speed_pwm_min_l;
     }
+    else
+    {
+        if (final_pwm_l > 0)
+            final_pwm_l = 0;
+        else if (final_pwm_l < 0 && final_pwm_l > -speed_pwm_min_l)
+            final_pwm_l = -speed_pwm_min_l;
+    }
 
     if (final_pwm_l >= 0)
     {
@@ -686,6 +693,13 @@ void motor_pid_right()
         else if (final_pwm_r > 0 && final_pwm_r < speed_pwm_min_r)
             final_pwm_r = speed_pwm_min_r;
     }
+    else
+    {
+        if (final_pwm_r > 0)
+            final_pwm_r = 0;
+        else if (final_pwm_r < 0 && final_pwm_r > -speed_pwm_min_r)
+            final_pwm_r = -speed_pwm_min_r;
+    }
 
     if (final_pwm_r < 0)
     {
@@ -722,7 +736,7 @@ void motor_diff_pid1()
     last_turn_error = turn_error;
 
     // 转向限幅（小转弯，慢速模式）
-    float turn_limit = 55.0f;
+    float turn_limit = 160.0f;
     if (turn_output > turn_limit)
         turn_output = turn_limit;
     if (turn_output < -turn_limit)
@@ -738,10 +752,10 @@ void motor_diff_pid1()
     diff_speedr_expect = current_base_speed - (int)turn_output;
 
     // 极限保护（慢速模式）
-    if (diff_speedl_expect < 0)
-        diff_speedl_expect = 0;
-    if (diff_speedr_expect < 0)
-        diff_speedr_expect = 0;
+    if (diff_speedl_expect < -60)
+        diff_speedl_expect = -60;
+    if (diff_speedr_expect < -60)
+        diff_speedr_expect = -60;
 
     if (diff_speedl_expect > 200)
         diff_speedl_expect = 200;
