@@ -725,27 +725,34 @@ void motor_diff_pid1()
         turn_error = 0;
     }
 
+    float abs_turn_error = abs_float(turn_error);
     float current_kp = diff_kp;
-    if (turn_error >= -10.0f && turn_error <= 10.0f)
+    float current_kd = 0.8f;
+    if (abs_turn_error <= 10.0f)
     {
-        current_kp = diff_kp * 0.5f; // 温柔一点，防止抖动
+        current_kp = diff_kp * 0.5f; // 小偏差温柔一点，防止抖动
+        current_kd = 1.0f;
+    }
+    else if (abs_turn_error >= 15.0f)
+    {
+        current_kp = 5.0f; // 大弯需要稳定进入内侧反转
     }
 
     // 转向 PD 控制
-    float turn_output = current_kp * turn_error + diff_kd * (turn_error - last_turn_error);
+    float turn_output = current_kp * turn_error + current_kd * (turn_error - last_turn_error);
     last_turn_error = turn_error;
 
-    // 转向限幅（小转弯，慢速模式）
-    float turn_limit = 300.0f;
+    // 转向限幅：允许急弯接近外侧正转、内侧反转，但避免D项尖峰过猛
+    float turn_limit = 220.0f;
     if (turn_output > turn_limit)
         turn_output = turn_limit;
     if (turn_output < -turn_limit)
         turn_output = -turn_limit;
 
     // 基础速度（慢速模式）
-    int current_base_speed = 100 - (int)(abs(turn_error) * 0.3f);
-    if (current_base_speed < 40)
-        current_base_speed = 40; // 最低40
+    int current_base_speed = 80 - (int)(abs_turn_error * 1.5f);
+    if (current_base_speed < 20)
+        current_base_speed = 20;
 
     // 计算左右轮目标速度
     diff_speedl_expect = current_base_speed + (int)turn_output;
