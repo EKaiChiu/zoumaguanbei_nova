@@ -45,6 +45,7 @@ public:
 
     bool init();
     bool update(int& category);
+    bool updateFromFrame(const cv::Mat& img, int& category);
     void close();
 
 private:
@@ -109,10 +110,6 @@ bool CarVisionImpl::init() {
 
     if (!loadLabels()) {
         printf("加载 labels 失败: %s\n", LABELS_PATH);
-        return false;
-    }
-
-    if (!initCamera()) {
         return false;
     }
 
@@ -255,6 +252,16 @@ bool CarVisionImpl::update(int& category) {
     category = -1;
 
     cv::Mat img = captureFrame();
+    if (img.empty()) {
+        return false;
+    }
+
+    return updateFromFrame(img, category);
+}
+
+bool CarVisionImpl::updateFromFrame(const cv::Mat& img, int& category) {
+    category = -1;
+
     if (img.empty()) {
         return false;
     }
@@ -515,6 +522,30 @@ int vision_get() {
     int category = -1;
 
     if (g_vision->update(category)) {
+        return category;
+    }
+
+    return -1;
+}
+
+int vision_get_from_rgb565(const uint16_t *rgb565, int width, int height) {
+    if (g_vision == nullptr || rgb565 == nullptr || width <= 0 || height <= 0) {
+        return -1;
+    }
+
+    cv::Mat frame(height, width, CV_8UC3);
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            uint16_t pixel = rgb565[y * width + x];
+            uint8_t r = (uint8_t)(((pixel >> 11) & 0x1F) * 255 / 31);
+            uint8_t g = (uint8_t)(((pixel >> 5) & 0x3F) * 255 / 63);
+            uint8_t b = (uint8_t)((pixel & 0x1F) * 255 / 31);
+            frame.at<cv::Vec3b>(y, x) = cv::Vec3b(b, g, r);
+        }
+    }
+
+    int category = -1;
+    if (g_vision->updateFromFrame(frame, category)) {
         return category;
     }
 

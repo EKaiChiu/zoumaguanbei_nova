@@ -233,18 +233,19 @@ int main()
                ImageStatus.Left_Line, ImageStatus.Right_Line, ImageStatus.WhiteLine, ImageFlag.image_element_rings_flag,
                ImageStatus.Road_type);
 #endif
-        static int vision_frame_counter = 0;
-        if (vision_ready && ++vision_frame_counter >= 10)
-        {
-            vision_frame_counter = 0;
-            int vision_result = vision_get();
-            printf("vision_get() result: %d\n", vision_result);
-        }
         // ========== 红色目标检测==========
         static red_detect red_result;
         uint16_t *rgb_image = uvc_cam.get_rgb_image_ptr();
         if (rgb_image != nullptr)
         {
+            static int vision_frame_counter = 0;
+            if (vision_ready && ++vision_frame_counter >= 10)
+            {
+                vision_frame_counter = 0;
+                int vision_result = vision_get_from_rgb565(rgb_image, UVC_WIDTH, UVC_HEIGHT);
+                printf("vision_get() result: %d\n", vision_result);
+            }
+
             red_detect_first(rgb_image, &red_result);
             if (red_result.is_found)
             {
