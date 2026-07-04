@@ -41,7 +41,6 @@
 #include "config.hpp"
 #include "ips200_draw.hpp"
 #include "CarVision.hpp"
-#include "red_detect.hpp"
 #include "menu.hpp"
 
 // ====================== 网络配置宏定义 ======================
@@ -233,8 +232,6 @@ int main()
                ImageStatus.Left_Line, ImageStatus.Right_Line, ImageStatus.WhiteLine, ImageFlag.image_element_rings_flag,
                ImageStatus.Road_type);
 #endif
-        // ========== 红色目标检测==========
-        static red_detect red_result;
         uint16_t *rgb_image = uvc_cam.get_rgb_image_ptr();
         if (rgb_image != nullptr)
         {
@@ -245,13 +242,6 @@ int main()
                 int vision_result = vision_get_from_rgb565(rgb_image, UVC_WIDTH, UVC_HEIGHT);
                 printf("vision_get() result: %d\n", vision_result);
             }
-
-            red_detect_first(rgb_image, &red_result);
-            if (red_result.is_found)
-            {
-                // printf("find red\r\n");
-            }
-            color_detect(rgb_image); // 打印底部中间像素的RGB数值
         }
 
         // ========== IPS200屏幕显示 ==========
@@ -276,12 +266,6 @@ int main()
             // 步骤2.5: 叠加横线标记到screen_buf
             draw_offline_line_on_screen(screen_buf); // 🔴丢线位置红色横线
             // draw_towpoint_lines_on_screen(screen_buf);   // 🟢前瞻点范围青色横线
-
-            // 步骤2.6: 红色目标画框（检测已在上面完成）
-            if (red_result.is_found)
-            {
-                draw_red_target_on_screen(screen_buf, &red_result);
-            }
 
             // 步骤3: 刷新整个IPS200屏幕（居中显示160×120）
             ips200.show_rgb565_image(80, 60, screen_buf[0], 160, 120, 160, 120, 0);
