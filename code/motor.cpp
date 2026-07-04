@@ -33,7 +33,7 @@ float speed_last_error_r;
 static float speed_dout_filtered_r = 1.0f;
 
 // 测试模式：0=寻迹, 1=速度测试, 2=固定PWM, 3=编码器观察, 4=映射验证
-int test_mode = 5;
+int test_mode = 0;
 int mode2_pwm = 1200;
 
 int pwm_max = 3500, pwm_min = -3500; // PWM限幅（duty=800对应8%占空比）
@@ -55,10 +55,10 @@ float y, x;
 int test_wheel = 1;  // 测试轮选择
 int test_speed = 60; // 测试目标速度
 
-int speed_pwm_min_l = 700;
-int speed_pwm_min_r = 700;
-float speed_pwm_feedforward_l = 10.0f;
-float speed_pwm_feedforward_r = 10.0f;
+int speed_pwm_min_l = 750;
+int speed_pwm_min_r = 725;
+float speed_pwm_feedforward_l = 10.6f;
+float speed_pwm_feedforward_r = 10.3f;
 
 static void reset_speed_pid_state()
 {
@@ -144,12 +144,12 @@ void motor_argument()
     diff_speedr_expect = (int16)speed_goal_r;
 
     // ✅ 低速PID参数（Kp=8.0确保pwm能达到800启动）
-    speed_p_l = 20.5f; // 提高！err=100→pwm=800
-    speed_i_l = 0.0f;  // 小积分防饱和
-    speed_d_l = 0.0f;  // 降低D项
+    speed_p_l = 0.35f;
+    speed_i_l = 0.020f;
+    speed_d_l = 0.0f;
 
-    speed_p_r = 20.0f;
-    speed_i_r = 0.0f;
+    speed_p_r = 0.35f;
+    speed_i_r = 0.020f;
     speed_d_r = 0.0f;
 }
 
