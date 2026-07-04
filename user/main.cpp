@@ -46,6 +46,7 @@
 // ====================== 网络配置宏定义 ======================
 #define SERVER_IP "10.18.55.68" // TCP服务端IP地址（电脑IP，需手动修改）
 #define PORT 8086               // TCP通信端口号
+#define IMAGE_TRANSFER_INTERVAL 1
 
 // 调试开关：取消注释启用调试打印，正式运行时注释掉以提升性能
 // #define DEBUG_PRINT
@@ -272,22 +273,24 @@ int main()
             Menu_Draw();
         }
 
-        // ========== 第二部分：逐飞助手图传数据准备（优化：每3帧刷新一次）==========
+        // ========== 第二部分：逐飞助手图传数据准备（每帧刷新一次）==========
         static int frame_counter = 0;
-        if (++frame_counter % 3 == 0)
-        { // 降低到1/3帧率（约10fps足够调试）
+        if (++frame_counter >= IMAGE_TRANSFER_INTERVAL)
+        {
+            frame_counter = 0;
             // 准备灰度二值化图像到image_copy数组（使用处理后的80×60图像，2倍放大到160×120）
             for (int y = 0; y < LCDH; y++)
             {
+                uint8_t *row0 = image_copy[y * 2];
+                uint8_t *row1 = image_copy[y * 2 + 1];
                 for (int x = 0; x < LCDW; x++)
                 {
                     uint8_t color = (Pixle[y][x] == 0) ? 0 : 255;
-                    int map_y = y * 2; // 60行→120行（2倍放大）
                     int map_x = x * 2; // 80列→160列（2倍放大）
-                    image_copy[map_y][map_x] = color;
-                    image_copy[map_y][map_x + 1] = color;
-                    image_copy[map_y + 1][map_x] = color;
-                    image_copy[map_y + 1][map_x + 1] = color;
+                    row0[map_x] = color;
+                    row0[map_x + 1] = color;
+                    row1[map_x] = color;
+                    row1[map_x + 1] = color;
                 }
             }
 
