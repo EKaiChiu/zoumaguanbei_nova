@@ -646,12 +646,12 @@ void motor_diff_pid1()
     float current_kd = 0.20f;
     if (abs_turn_error <= 10.0f)
     {
-        current_kp = diff_kp * 3.0f; // 小偏差温柔一点，防止抖动
+        current_kp = diff_kp * 2.5f; // 小偏差温柔一点，防止抖动
         current_kd = 0.25f;
     }
     else if (abs_turn_error >= 18.0f)
     {
-        current_kp = 6.5f; // 大弯需要稳定进入内侧反转
+        current_kp = 4.5f; // 大弯需要稳定进入内侧反转
     }
 
     // 转向 PD 控制
@@ -667,7 +667,7 @@ void motor_diff_pid1()
         turn_output = -turn_limit;
 
     // 基础速度（慢速模式）
-    float max_turn_step = (abs_turn_error >= 18.0f) ? 32.0f : 10.0f;
+    float max_turn_step = (abs_turn_error >= 18.0f) ? 30.0f : 10.0f;
     float turn_delta = turn_output - filtered_turn_output;
     if (turn_delta > max_turn_step)
         turn_delta = max_turn_step;
