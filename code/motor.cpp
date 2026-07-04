@@ -716,6 +716,7 @@ void motor_pid_right()
 void motor_diff_pid1()
 {
     static float last_turn_error = 0;
+    static float filtered_turn_output = 0;
 
     // 图像偏差（根据实际调整中线值）
     float turn_error = 40 - ImageStatus.Det_True;
@@ -727,22 +728,25 @@ void motor_diff_pid1()
 
     float abs_turn_error = abs_float(turn_error);
     float current_kp = diff_kp;
-    float current_kd = 0.8f;
+    float current_kd = 0.35f;
     if (abs_turn_error <= 10.0f)
     {
         current_kp = diff_kp * 0.5f; // 小偏差温柔一点，防止抖动
-        current_kd = 1.0f;
+        current_kd = 0.5f;
     }
-    else if (abs_turn_error >= 15.0f)
+    else if (abs_turn_error >= 18.0f)
     {
-        current_kp = 5.0f; // 大弯需要稳定进入内侧反转
+        current_kp = 4.4f; // 大弯需要稳定进入内侧反转
     }
 
     // 转向 PD 控制
+    }
+
     float turn_output = current_kp * turn_error + current_kd * (turn_error - last_turn_error);
     last_turn_error = turn_error;
 
     // 转向限幅：允许急弯接近外侧正转、内侧反转，但避免D项尖峰过猛
+    float turn_limit = 220.0f;
     float turn_limit = 220.0f;
     if (turn_output > turn_limit)
         turn_output = turn_limit;
@@ -750,13 +754,22 @@ void motor_diff_pid1()
         turn_output = -turn_limit;
 
     // 基础速度（慢速模式）
-    int current_base_speed = 80 - (int)(abs_turn_error * 1.5f);
-    if (current_base_speed < 20)
-        current_base_speed = 20;
+    float max_turn_step = (abs_turn_error >= 18.0f) ? 28.0f : 16.0f;
+    float turn_delta = turn_output - filtered_turn_output;
+    if (turn_delta > max_turn_step)
+        turn_delta = max_turn_step;
+    if (turn_delta < -max_turn_step)
+        turn_delta = -max_turn_step;
+    filtered_turn_output += turn_delta;
+    filtered_turn_output = 0.8f * filtered_turn_output + 0.2f * turn_output;
+
+    int current_base_speed = 95 - (int)(abs_turn_error * 1.2f);
+    if (current_base_speed < 30)
+        current_base_speed = 30;
 
     // 计算左右轮目标速度
-    diff_speedl_expect = current_base_speed + (int)turn_output;
-    diff_speedr_expect = current_base_speed - (int)turn_output;
+    diff_speedl_expect = current_base_speed + (int)filtered_turn_output;
+    diff_speedr_expect = current_base_speed - (int)filtered_turn_output;
 
     // 极限保护（慢速模式）
     if (diff_speedl_expect < -200)
