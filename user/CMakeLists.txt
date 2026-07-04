@@ -51,6 +51,7 @@ include_directories(
     ../../libraries/zf_components/tflm/tensorflow/lite/core/api
     ../../libraries/zf_components/tflm/tensorflow/lite/core/c
     ../../libraries/zf_components/tflm/tensorflow/lite/schema
+    ../../libraries/zf_components/ncnn/include
     ../../libraries/zf_components/ncnn/include/ncnn
 )
 
@@ -80,6 +81,7 @@ set_target_properties(${PROJ_NAME} PROPERTIES
 target_link_libraries(
 ${PROJ_NAME} 
 ${OpenCV_LIBS}
+ncnn
 tflm          # 链接TFLM静态库（必须）
 pthread       # 线程库（TFLM内部使用）
 m             # 数学库（算子计算依赖）

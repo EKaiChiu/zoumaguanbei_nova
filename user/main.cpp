@@ -40,6 +40,7 @@
 #include "image.hpp"
 #include "config.hpp"
 #include "ips200_draw.hpp"
+#include "CarVision.hpp"
 #include "red_detect.hpp"
 #include "menu.hpp"
 
