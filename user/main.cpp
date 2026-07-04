@@ -197,6 +197,12 @@ int main()
         return -1;
     }
 
+    bool vision_ready = vision_init();
+    if (!vision_ready)
+    {
+        printf("[VISION] init failed, vision disabled.\r\n");
+    }
+
     printf("System init complete! Running...\r\n");
 
     // ====================== 5. 主循环 ======================
@@ -227,10 +233,13 @@ int main()
                ImageStatus.Left_Line, ImageStatus.Right_Line, ImageStatus.WhiteLine, ImageFlag.image_element_rings_flag,
                ImageStatus.Road_type);
 #endif
-        //vision_init();
-        //vision_get();
-        //printf("vision_get() result: %d\n", vision_get());
-        //vision_close();
+        static int vision_frame_counter = 0;
+        if (vision_ready && ++vision_frame_counter >= 10)
+        {
+            vision_frame_counter = 0;
+            int vision_result = vision_get();
+            printf("vision_get() result: %d\n", vision_result);
+        }
         // ========== 红色目标检测==========
         static red_detect red_result;
         uint16_t *rgb_image = uvc_cam.get_rgb_image_ptr();
@@ -318,6 +327,7 @@ void sigint_handler(int signum)
 void cleanup()
 {
     pit_timer.stop();
+    vision_close();
     printf("程序退出，执行清理操作\r\n");
     motor1_pwm_1.set_duty(0); // ⚠️ 使用 t3 的变量名！
     motor2_pwm_2.set_duty(0); // ⚠️ 使用 t3 的变量名！
