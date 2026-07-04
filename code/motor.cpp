@@ -306,8 +306,7 @@ void motor_control()
             max_abs_error_r = 0.0f;
             started = 1;
 
-            printf("[MODE5] Auto tune both wheels | target L=%d R=%d\r\n",
-                   diff_speedl_expect, diff_speedr_expect);
+            printf("[MODE5] Auto tune both wheels | target L=%d R=%d\r\n", diff_speedl_expect, diff_speedr_expect);
         }
 
         motor_pid_left();
@@ -316,13 +315,13 @@ void motor_control()
         float abs_error_l = abs_float(speed_error_l);
         float abs_error_r = abs_float(speed_error_r);
 
-        if (sample_count > 0 && ((speed_error_l > 0.0f && last_error_l < 0.0f) ||
-                                 (speed_error_l < 0.0f && last_error_l > 0.0f)))
+        if (sample_count > 0 &&
+            ((speed_error_l > 0.0f && last_error_l < 0.0f) || (speed_error_l < 0.0f && last_error_l > 0.0f)))
         {
             sign_changes_l++;
         }
-        if (sample_count > 0 && ((speed_error_r > 0.0f && last_error_r < 0.0f) ||
-                                 (speed_error_r < 0.0f && last_error_r > 0.0f)))
+        if (sample_count > 0 &&
+            ((speed_error_r > 0.0f && last_error_r < 0.0f) || (speed_error_r < 0.0f && last_error_r > 0.0f)))
         {
             sign_changes_r++;
         }
@@ -347,12 +346,8 @@ void motor_control()
             float avg_abs_error_l = sum_abs_error_l / (float)sample_count;
             float avg_abs_error_r = sum_abs_error_r / (float)sample_count;
 
-            int stable_l = (abs_float(avg_error_l) < 8.0f &&
-                            avg_abs_error_l < 13.0f &&
-                            max_abs_error_l < 85.0f);
-            int stable_r = (abs_float(avg_error_r) < 8.0f &&
-                            avg_abs_error_r < 13.0f &&
-                            max_abs_error_r < 85.0f);
+            int stable_l = (abs_float(avg_error_l) < 8.0f && avg_abs_error_l < 13.0f && max_abs_error_l < 85.0f);
+            int stable_r = (abs_float(avg_error_r) < 8.0f && avg_abs_error_r < 13.0f && max_abs_error_r < 85.0f);
 
             if (!tune_locked && stable_l && stable_r)
                 stable_windows++;
@@ -363,10 +358,10 @@ void motor_control()
             {
                 tune_locked = 1;
                 reset_speed_pid_state();
-                printf("[AI PID LOCKED] target=%d | L P=%.2f I=%.3f D=%.2f FF=%.1f MIN=%d | R P=%.2f I=%.3f D=%.2f FF=%.1f MIN=%d\r\n",
-                       test_speed,
-                       speed_p_l, speed_i_l, speed_d_l, speed_pwm_feedforward_l, speed_pwm_min_l,
-                       speed_p_r, speed_i_r, speed_d_r, speed_pwm_feedforward_r, speed_pwm_min_r);
+                printf("[AI PID LOCKED] target=%d | L P=%.2f I=%.3f D=%.2f FF=%.1f MIN=%d | R P=%.2f I=%.3f D=%.2f "
+                       "FF=%.1f MIN=%d\r\n",
+                       test_speed, speed_p_l, speed_i_l, speed_d_l, speed_pwm_feedforward_l, speed_pwm_min_l, speed_p_r,
+                       speed_i_r, speed_d_r, speed_pwm_feedforward_r, speed_pwm_min_r);
             }
 
             if (tune_locked && avg_error_l > 6.0f)
@@ -442,14 +437,14 @@ void motor_control()
                 speed_d_r = clamp_float(speed_d_r + 0.02f, 0.0f, 1.2f);
             }
 
-            printf("[AI PID %s L] avg=%.1f abs=%.1f max=%.1f cross=%d stable=%d | P=%.2f I=%.3f D=%.2f FF=%.1f MIN=%d\r\n",
-                   tune_locked ? "LOCK" : "TUNE",
-                   avg_error_l, avg_abs_error_l, max_abs_error_l, sign_changes_l,
-                   stable_windows, speed_p_l, speed_i_l, speed_d_l, speed_pwm_feedforward_l, speed_pwm_min_l);
-            printf("[AI PID %s R] avg=%.1f abs=%.1f max=%.1f cross=%d stable=%d | P=%.2f I=%.3f D=%.2f FF=%.1f MIN=%d\r\n",
-                   tune_locked ? "LOCK" : "TUNE",
-                   avg_error_r, avg_abs_error_r, max_abs_error_r, sign_changes_r,
-                   stable_windows, speed_p_r, speed_i_r, speed_d_r, speed_pwm_feedforward_r, speed_pwm_min_r);
+            printf(
+                "[AI PID %s L] avg=%.1f abs=%.1f max=%.1f cross=%d stable=%d | P=%.2f I=%.3f D=%.2f FF=%.1f MIN=%d\r\n",
+                tune_locked ? "LOCK" : "TUNE", avg_error_l, avg_abs_error_l, max_abs_error_l, sign_changes_l,
+                stable_windows, speed_p_l, speed_i_l, speed_d_l, speed_pwm_feedforward_l, speed_pwm_min_l);
+            printf(
+                "[AI PID %s R] avg=%.1f abs=%.1f max=%.1f cross=%d stable=%d | P=%.2f I=%.3f D=%.2f FF=%.1f MIN=%d\r\n",
+                tune_locked ? "LOCK" : "TUNE", avg_error_r, avg_abs_error_r, max_abs_error_r, sign_changes_r,
+                stable_windows, speed_p_r, speed_i_r, speed_d_r, speed_pwm_feedforward_r, speed_pwm_min_r);
 
             sample_count = 0;
             sign_changes_l = 0;
@@ -464,15 +459,16 @@ void motor_control()
 
         if (cnt % 10 == 0)
         {
-            int final_pwm_l_debug = calc_speed_pwm_debug(speed_goal_l, speed_pid_out_l,
-                                                         speed_pwm_feedforward_l, speed_pwm_min_l);
-            int final_pwm_r_debug = calc_speed_pwm_debug(speed_goal_r, speed_pid_out_r,
-                                                         speed_pwm_feedforward_r, speed_pwm_min_r);
+            int final_pwm_l_debug =
+                calc_speed_pwm_debug(speed_goal_l, speed_pid_out_l, speed_pwm_feedforward_l, speed_pwm_min_l);
+            int final_pwm_r_debug =
+                calc_speed_pwm_debug(speed_goal_r, speed_pid_out_r, speed_pwm_feedforward_r, speed_pwm_min_r);
 
-            printf("AI%s L target=%d speed=%d err=%.1f comp=%.1f pwm=%d | R target=%d speed=%d err=%.1f comp=%.1f pwm=%d\r\n",
-                   tune_locked ? "[LOCK]" : "",
-                   diff_speedl_expect, encoderA_count, speed_error_l, speed_pid_out_l, final_pwm_l_debug,
-                   diff_speedr_expect, encoderB_count, speed_error_r, speed_pid_out_r, final_pwm_r_debug);
+            printf("AI%s L target=%d speed=%d err=%.1f comp=%.1f pwm=%d | R target=%d speed=%d err=%.1f comp=%.1f "
+                   "pwm=%d\r\n",
+                   tune_locked ? "[LOCK]" : "", diff_speedl_expect, encoderA_count, speed_error_l, speed_pid_out_l,
+                   final_pwm_l_debug, diff_speedr_expect, encoderB_count, speed_error_r, speed_pid_out_r,
+                   final_pwm_r_debug);
         }
 
         return;
@@ -498,8 +494,8 @@ void motor_control()
 
             setup_speed_test_target();
 
-            printf("[MODE3] Speed PID test | wheel=%d | L=%d R=%d\r\n",
-                   test_wheel, diff_speedl_expect, diff_speedr_expect);
+            printf("[MODE3] Speed PID test | wheel=%d | L=%d R=%d\r\n", test_wheel, diff_speedl_expect,
+                   diff_speedr_expect);
         }
 
         motor_pid_left();
@@ -507,16 +503,15 @@ void motor_control()
 
         if (++cnt % 10 == 0)
         {
-            int final_pwm_l_debug = calc_speed_pwm_debug(speed_goal_l, speed_pid_out_l,
-                                                         speed_pwm_feedforward_l, speed_pwm_min_l);
-            int final_pwm_r_debug = calc_speed_pwm_debug(speed_goal_r, speed_pid_out_r,
-                                                         speed_pwm_feedforward_r, speed_pwm_min_r);
+            int final_pwm_l_debug =
+                calc_speed_pwm_debug(speed_goal_l, speed_pid_out_l, speed_pwm_feedforward_l, speed_pwm_min_l);
+            int final_pwm_r_debug =
+                calc_speed_pwm_debug(speed_goal_r, speed_pid_out_r, speed_pwm_feedforward_r, speed_pwm_min_r);
 
-            printf("L target=%d speed=%d err=%.1f comp=%.1f pwm=%d | R target=%d speed=%d err=%.1f comp=%.1f pwm=%d\r\n",
-                   diff_speedl_expect, encoderA_count, speed_error_l, speed_pid_out_l,
-                   final_pwm_l_debug,
-                   diff_speedr_expect, encoderB_count, speed_error_r, speed_pid_out_r,
-                   final_pwm_r_debug);
+            printf(
+                "L target=%d speed=%d err=%.1f comp=%.1f pwm=%d | R target=%d speed=%d err=%.1f comp=%.1f pwm=%d\r\n",
+                diff_speedl_expect, encoderA_count, speed_error_l, speed_pid_out_l, final_pwm_l_debug,
+                diff_speedr_expect, encoderB_count, speed_error_r, speed_pid_out_r, final_pwm_r_debug);
         }
         return;
     }
@@ -731,12 +726,12 @@ void motor_diff_pid1()
     float current_kd = 0.20f;
     if (abs_turn_error <= 10.0f)
     {
-        current_kp = diff_kp * 0.35f; // 小偏差温柔一点，防止抖动
+        current_kp = diff_kp * 3.0f; // 小偏差温柔一点，防止抖动
         current_kd = 0.25f;
     }
     else if (abs_turn_error >= 18.0f)
     {
-        current_kp = 2.8f; // 大弯需要稳定进入内侧反转
+        current_kp = 5.0f; // 大弯需要稳定进入内侧反转
     }
 
     // 转向 PD 控制
@@ -761,7 +756,7 @@ void motor_diff_pid1()
     filtered_turn_output += turn_delta;
     filtered_turn_output = 0.8f * filtered_turn_output + 0.2f * turn_output;
 
-    int current_base_speed = 190 - (int)(abs_turn_error * 2.0f);
+    int current_base_speed = 140 - (int)(abs_turn_error * 2.0f);
     if (current_base_speed < 60)
         current_base_speed = 60;
 
