@@ -22,7 +22,7 @@
 // ════════════════════════════════════════════════
 // 全局变量声明
 // ════════════════════════════════════════════════
-extern uint8 image_copy[UVC_HEIGHT][UVC_WIDTH];
+extern uint8 image_copy[LCDH][LCDW];
 
 // ════════════════════════════════════════════════
 // 功能 #1：画左边界线（红色）
@@ -349,50 +349,34 @@ void draw_annotation_on_imagecopy(void)
     for (int y = 0; y < LCDH; y++)
     {
         // ⚠️ 使用 LeftBorder/RightBorder（参考工程风格）
-        int left_x = ImageDeal[y].LeftBorder * 2;
-        int right_x = ImageDeal[y].RightBorder * 2;
+        int left_x = ImageDeal[y].LeftBorder;
+        int right_x = ImageDeal[y].RightBorder;
         // ⚠️ 参考工程算法：中线 = (左边界 + 右边界) / 2（正确✅）
-        int mid_x = (ImageDeal[y].LeftBorder + ImageDeal[y].RightBorder) / 2 * 2;
-        int map_y = y * 2;
+        int mid_x = (ImageDeal[y].LeftBorder + ImageDeal[y].RightBorder) / 2;
 
-        // 左边界线（2像素宽）
-        if (left_x >= 0 && left_x < 160)
+        // 左边界线
+        if (left_x >= 0 && left_x < LCDW)
         {
-            image_copy[map_y][left_x] = BOUNDARY_GRAY;
-            image_copy[map_y + 1][left_x] = BOUNDARY_GRAY;
-            if (left_x + 1 < 160)
-            { // 加粗：向右扩展1像素
-                image_copy[map_y][left_x + 1] = BOUNDARY_GRAY;
-                image_copy[map_y + 1][left_x + 1] = BOUNDARY_GRAY;
-            }
+            image_copy[y][left_x] = BOUNDARY_GRAY;
         }
 
-        // 右边界线（2像素宽）
-        if (right_x >= 0 && right_x < 160)
+        // 右边界线
+        if (right_x >= 0 && right_x < LCDW)
         {
-            image_copy[map_y][right_x] = BOUNDARY_GRAY;
-            image_copy[map_y + 1][right_x] = BOUNDARY_GRAY;
-            if (right_x - 1 >= 0)
-            { // 加粗：向左扩展1像素
-                image_copy[map_y][right_x - 1] = BOUNDARY_GRAY;
-                image_copy[map_y + 1][right_x - 1] = BOUNDARY_GRAY;
-            }
+            image_copy[y][right_x] = BOUNDARY_GRAY;
         }
 
         // 中线轨迹（3像素宽：左-中-右对称）
-        if (mid_x >= 1 && mid_x < 159)
+        if (mid_x >= 1 && mid_x < (LCDW - 1))
         {
-            image_copy[map_y][mid_x] = TRAJECTORY_GRAY;
-            image_copy[map_y + 1][mid_x] = TRAJECTORY_GRAY;
+            image_copy[y][mid_x] = TRAJECTORY_GRAY;
             if (mid_x - 1 >= 0)
             { // 左侧1像素
-                image_copy[map_y][mid_x - 1] = TRAJECTORY_GRAY;
-                image_copy[map_y + 1][mid_x - 1] = TRAJECTORY_GRAY;
+                image_copy[y][mid_x - 1] = TRAJECTORY_GRAY;
             }
-            if (mid_x + 1 < 160)
+            if (mid_x + 1 < LCDW)
             { // 右侧1像素
-                image_copy[map_y][mid_x + 1] = TRAJECTORY_GRAY;
-                image_copy[map_y + 1][mid_x + 1] = TRAJECTORY_GRAY;
+                image_copy[y][mid_x + 1] = TRAJECTORY_GRAY;
             }
         }
     }

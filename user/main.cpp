@@ -64,7 +64,7 @@ uint8 xy_x1_boundary[BOUNDARY_NUM], xy_x2_boundary[BOUNDARY_NUM], xy_x3_boundary
 uint8 xy_y1_boundary[BOUNDARY_NUM], xy_y2_boundary[BOUNDARY_NUM], xy_y3_boundary[BOUNDARY_NUM];
 uint8 x1_boundary[UVC_HEIGHT], x2_boundary[UVC_HEIGHT], x3_boundary[UVC_HEIGHT];
 uint8 y1_boundary[UVC_WIDTH], y2_boundary[UVC_WIDTH], y3_boundary[UVC_WIDTH];
-uint8 image_copy[UVC_HEIGHT][UVC_WIDTH];
+uint8 image_copy[LCDH][LCDW];
 
 // ====================== TCP通信包装函数 ======================
 zf_driver_tcp_client *g_tcp_client = nullptr;
@@ -113,7 +113,7 @@ int main()
 
     // ====================== 3. 边界信息配置 ======================
 #if (0 == INCLUDE_BOUNDARY_TYPE)
-    seekfree_assistant_camera_information_config(SEEKFREE_ASSISTANT_MT9V03X, image_copy[0], UVC_WIDTH, UVC_HEIGHT);
+    seekfree_assistant_camera_information_config(SEEKFREE_ASSISTANT_MT9V03X, image_copy[0], LCDW, LCDH);
 
 #elif (1 == INCLUDE_BOUNDARY_TYPE)
     for (i = 0; i < UVC_HEIGHT; i++)
@@ -278,19 +278,12 @@ int main()
         if (++frame_counter >= IMAGE_TRANSFER_INTERVAL)
         {
             frame_counter = 0;
-            // 准备灰度二值化图像到image_copy数组（使用处理后的80×60图像，2倍放大到160×120）
+            // 准备灰度二值化图像到image_copy数组（80×60低带宽图传）
             for (int y = 0; y < LCDH; y++)
             {
-                uint8_t *row0 = image_copy[y * 2];
-                uint8_t *row1 = image_copy[y * 2 + 1];
                 for (int x = 0; x < LCDW; x++)
                 {
-                    uint8_t color = (Pixle[y][x] == 0) ? 0 : 255;
-                    int map_x = x * 2; // 80列→160列（2倍放大）
-                    row0[map_x] = color;
-                    row0[map_x + 1] = color;
-                    row1[map_x] = color;
-                    row1[map_x + 1] = color;
+                    image_copy[y][x] = (Pixle[y][x] == 0) ? 0 : 255;
                 }
             }
 
