@@ -2,7 +2,7 @@
 
 #define RED_ROW_RATIO 0.10f // 红色像素占扫描宽度的比例超过此值视为红色行,当前为10%
 
-#define RED_CONFIRM_ROWS 3 // 色块确认所需连续红色行数,当前为3行
+#define RED_CONFIRM_ROWS 2 // 色块确认所需连续红色行数,当前为2行
 
 #define RED_TOP_GAP_MAX 2 // 向上找色块顶部时允许的最大间断行数,当前为2行
 
