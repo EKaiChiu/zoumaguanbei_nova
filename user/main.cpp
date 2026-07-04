@@ -233,6 +233,10 @@ int main()
         if (rgb_image != nullptr)
         {
             red_detect_first(rgb_image, &red_result);
+            if (red_result.is_found)
+            {
+                printf("find red\r\n");
+            }
             color_detect(rgb_image); // 打印底部中间像素的RGB数值
         }
 
