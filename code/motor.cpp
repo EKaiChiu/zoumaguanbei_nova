@@ -392,7 +392,7 @@ void motor_control()
             {
                 speed_pwm_min_r -= 10;
                 speed_pwm_feedforward_r = clamp_float(speed_pwm_feedforward_r - 0.1f, 4.0f, 24.0f);
-                reset_speed_pid_state()it;
+                reset_speed_pid_state();
             }
 
             if (!tune_locked && avg_error_l > 6.0f)
