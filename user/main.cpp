@@ -227,10 +227,10 @@ int main()
                ImageStatus.Left_Line, ImageStatus.Right_Line, ImageStatus.WhiteLine, ImageFlag.image_element_rings_flag,
                ImageStatus.Road_type);
 #endif
-
-        vision_get();
-        printf("vision_get() result: %d\n", vision_get());
-        vision_close();
+        //vision_init();
+        //vision_get();
+        //printf("vision_get() result: %d\n", vision_get());
+        //vision_close();
         // ========== 红色目标检测==========
         static red_detect red_result;
         uint16_t *rgb_image = uvc_cam.get_rgb_image_ptr();
@@ -239,7 +239,7 @@ int main()
             red_detect_first(rgb_image, &red_result);
             if (red_result.is_found)
             {
-                printf("find red\r\n");
+                // printf("find red\r\n");
             }
             color_detect(rgb_image); // 打印底部中间像素的RGB数值
         }
