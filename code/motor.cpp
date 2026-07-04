@@ -740,7 +740,6 @@ void motor_diff_pid1()
     }
 
     // 转向 PD 控制
-    }
 
     float turn_output = current_kp * turn_error + current_kd * (turn_error - last_turn_error);
     last_turn_error = turn_error;
