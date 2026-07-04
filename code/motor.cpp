@@ -348,18 +348,18 @@ void motor_control()
             float avg_abs_error_r = sum_abs_error_r / (float)sample_count;
 
             int stable_l = (abs_float(avg_error_l) < 8.0f &&
-                            avg_abs_error_l < 10.0f &&
-                            max_abs_error_l < 35.0f);
+                            avg_abs_error_l < 13.0f &&
+                            max_abs_error_l < 85.0f);
             int stable_r = (abs_float(avg_error_r) < 8.0f &&
-                            avg_abs_error_r < 10.0f &&
-                            max_abs_error_r < 35.0f);
+                            avg_abs_error_r < 13.0f &&
+                            max_abs_error_r < 85.0f);
 
             if (!tune_locked && stable_l && stable_r)
                 stable_windows++;
-            else if (!tune_locked)
-                stable_windows = 0;
+            else if (!tune_locked && stable_windows > 0)
+                stable_windows--;
 
-            if (!tune_locked && stable_windows >= 2)
+            if (!tune_locked && stable_windows >= 3)
             {
                 tune_locked = 1;
                 reset_speed_pid_state();
