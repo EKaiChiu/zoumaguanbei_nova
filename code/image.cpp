@@ -1876,7 +1876,7 @@ void GetDet()
     float UnitAll = 0.0f;
     const int det_start_row = 5;  // original row 10 after 2x compression
     const int det_end_row = 55;   // original row 110 after 2x compression
-    const int det_mid_row = (det_start_row + det_end_row) / 2;
+    const int det_mid_row = 22;
 
     int start_row = det_start_row;
     if (start_row < 0)
