@@ -651,8 +651,8 @@ void motor_diff_pid1()
     }
     else if (abs_turn_error >= 10.0f)
     {
-        current_kp = 9.0f; // stronger bend turn
-        current_kd = 0.45f;
+        current_kp = 8.2f; // stronger bend turn
+        current_kd = 0.55f;
     }
     else
     {
@@ -666,21 +666,25 @@ void motor_diff_pid1()
     last_turn_error = turn_error;
 
     // 转向限幅：允许急弯接近外侧正转、内侧反转，但避免D项尖峰过猛
-    float turn_limit = 300.0f;
+    float turn_limit = 280.0f;
     if (turn_output > turn_limit)
         turn_output = turn_limit;
     if (turn_output < -turn_limit)
         turn_output = -turn_limit;
 
     // 基础速度（慢速模式）
-    float max_turn_step = (abs_turn_error >= 10.0f) ? 90.0f : 18.0f;
+    float max_turn_step = (abs_turn_error >= 10.0f) ? 75.0f : 25.0f;
     float turn_delta = turn_output - filtered_turn_output;
     if (turn_delta > max_turn_step)
         turn_delta = max_turn_step;
     if (turn_delta < -max_turn_step)
         turn_delta = -max_turn_step;
     filtered_turn_output += turn_delta;
-    filtered_turn_output = 0.8f * filtered_turn_output + 0.2f * turn_output;
+    filtered_turn_output = 0.55f * filtered_turn_output + 0.45f * turn_output;
+    if (abs_turn_error <= 4.0f)
+    {
+        filtered_turn_output *= 0.45f;
+    }
 
     int current_base_speed = 155 - (int)(abs_turn_error * 5.0f);
     if (current_base_speed < 25)
