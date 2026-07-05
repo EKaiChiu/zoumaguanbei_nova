@@ -649,7 +649,7 @@ void motor_diff_pid1()
         current_kp = diff_kp * 2.8f;
         current_kd = 0.25f;
     }
-    else if (abs_turn_error >= 10.0f)
+    else if (abs_turn_error >= 8.0f)
     {
         current_kp = 9.0f; // stronger bend turn
         current_kd = 0.45f;
@@ -674,7 +674,12 @@ void motor_diff_pid1()
         turn_output = -turn_limit;
 
     // 基础速度（慢速模式）
-    float max_turn_step = (abs_turn_error >= 10.0f) ? 90.0f : 18.0f;
+    if (turn_cross_zero)
+    {
+        filtered_turn_output = 0.0f;
+    }
+
+    float max_turn_step = (abs_turn_error >= 8.0f) ? 105.0f : 28.0f;
     float turn_delta = turn_output - filtered_turn_output;
     if (turn_delta > max_turn_step)
         turn_delta = max_turn_step;
@@ -682,12 +687,12 @@ void motor_diff_pid1()
         turn_delta = -max_turn_step;
     filtered_turn_output += turn_delta;
     filtered_turn_output = 0.8f * filtered_turn_output + 0.2f * turn_output;
-    if (turn_cross_zero || abs_turn_error <= 3.0f)
+    if (abs_turn_error <= 3.0f)
     {
-        filtered_turn_output = 0.0f;
+        filtered_turn_output *= 0.35f;
     }
 
-    int current_base_speed = 155 - (int)(abs_turn_error * 5.0f);
+    int current_base_speed = 145 - (int)(abs_turn_error * 5.5f);
     if (current_base_speed < 25)
         current_base_speed = 25;
 
