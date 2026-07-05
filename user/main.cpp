@@ -276,7 +276,10 @@ int main()
             {
                 vision_frame_counter = 0;
                 int vision_result = vision_get_from_rgb565(rgb_image, UVC_WIDTH, UVC_HEIGHT);
-                printf("vision_get() result: %d\n", vision_result);
+                if (vision_result != -1)
+                {
+                    printf("vision_get() result: %d\n", vision_result);
+                }
             }
         }
 
