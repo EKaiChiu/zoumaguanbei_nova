@@ -44,11 +44,11 @@
 #include "menu.hpp"
 
 // ====================== 网络配置宏定义 ======================
-#define SERVER_IP "10.18.55.68" // TCP服务端IP地址（电脑IP，需手动修改）
-#define PORT 8086               // TCP通信端口号
+#define SERVER_IP "10.18.55.68"
+#define PORT 8086
 #define IMAGE_TRANSFER_INTERVAL 3
+#define IMAGE_TRANSFER_DEFAULT_STATE IMAGE_TRANSFER_OFF
 
-// 调试开关：取消注释启用调试打印，正式运行时注释掉以提升性能
 // #define DEBUG_PRINT
 
 // ======================清理退出函数======================
@@ -69,11 +69,35 @@ uint8 image_copy[LCDH][LCDW];
 // ====================== TCP通信包装函数 ======================
 zf_driver_tcp_client *g_tcp_client = nullptr;
 
+enum image_transfer_state_t
+{
+    IMAGE_TRANSFER_OFF = 0,
+    IMAGE_TRANSFER_INIT,
+    IMAGE_TRANSFER_RUNNING,
+    IMAGE_TRANSFER_ERROR,
+};
+
+static image_transfer_state_t image_transfer_state = IMAGE_TRANSFER_DEFAULT_STATE;
+static int image_transfer_fail_count = 0;
+
 static uint32 send_wrapper(const uint8 *buff, uint32 length)
 {
-    return g_tcp_client ? g_tcp_client->send_data(buff, length) : 0;
+    uint32 sent = g_tcp_client ? g_tcp_client->send_data(buff, length) : 0;
+    if (image_transfer_state == IMAGE_TRANSFER_RUNNING && sent == 0)
+    {
+        image_transfer_fail_count++;
+        if (image_transfer_fail_count >= 3)
+        {
+            image_transfer_state = IMAGE_TRANSFER_ERROR;
+            printf("[IMAGE] transfer disabled: tcp send failed\r\n");
+        }
+    }
+    else if (sent != 0)
+    {
+        image_transfer_fail_count = 0;
+    }
+    return sent;
 }
-
 static uint32 read_wrapper(uint8 *buff, uint32 length)
 {
     return g_tcp_client ? g_tcp_client->read_data(buff, length) : 0;
@@ -97,20 +121,30 @@ int main()
 
     // ====================== 2. TCP网络初始化 ======================
     zf_driver_tcp_client tcp_client;
-    g_tcp_client = &tcp_client;
 
-    if (tcp_client.init(SERVER_IP, PORT) == 0)
+    if (image_transfer_state == IMAGE_TRANSFER_INIT)
     {
-        tcp_client.set_retry_param(1, 1);
-        printf("tcp_client ok\r\n");
+        g_tcp_client = &tcp_client;
+        if (tcp_client.init(SERVER_IP, PORT) == 0)
+        {
+            tcp_client.set_retry_param(1, 1);
+            image_transfer_state = IMAGE_TRANSFER_RUNNING;
+            printf("[IMAGE] transfer running\r\n");
+        }
+        else
+        {
+            g_tcp_client = nullptr;
+            image_transfer_state = IMAGE_TRANSFER_ERROR;
+            printf("[IMAGE] transfer disabled: tcp init failed\r\n");
+        }
+
+        seekfree_assistant_interface_init(send_wrapper, read_wrapper);
     }
     else
     {
-        printf("tcp_client error\r\n");
-        return -1;
+        g_tcp_client = nullptr;
+        printf("[IMAGE] transfer off\r\n");
     }
-
-    seekfree_assistant_interface_init(send_wrapper, read_wrapper);
 
     // ====================== 3. 边界信息配置 ======================
 #if (0 == INCLUDE_BOUNDARY_TYPE)
@@ -276,7 +310,7 @@ int main()
 
         // ========== 第二部分：逐飞助手图传数据准备（每帧刷新一次）==========
         static int frame_counter = 0;
-        if (++frame_counter >= IMAGE_TRANSFER_INTERVAL)
+        if (image_transfer_state == IMAGE_TRANSFER_RUNNING && ++frame_counter >= IMAGE_TRANSFER_INTERVAL)
         {
             frame_counter = 0;
             // 准备灰度二值化图像到image_copy数组（80×60低带宽图传）
