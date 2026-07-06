@@ -25,8 +25,8 @@ static const float AVOID_TARGET_ANGLE_DEG = 45.0f;
 static const int16 AVOID_LEFT_SPEED = -60;
 static const int16 AVOID_RIGHT_SPEED = 60;
 
-/* 当前按你的要求默认关闭绕行功能。 */
-static AvoidState avoid_state = AVOID_DISABLED;
+/* 当前默认开启绕行功能，等待视觉结果 0 触发。 */
+static AvoidState avoid_state = AVOID_IDLE;
 static int latest_vision_result = -1;
 
 /* 从进入左转状态开始累计的相对角度，单位：度。 */
@@ -45,7 +45,7 @@ static void avoid_print_state_once(void)
 
 void avoid_init(void)
 {
-    avoid_state = AVOID_DISABLED;
+    avoid_state = AVOID_IDLE;
     latest_vision_result = -1;
     avoid_angle_deg = 0.0f;
     printed_state = -1;

@@ -226,6 +226,9 @@ static ImuYawPrintState imu_yaw_print_state = IMU_YAW_WAIT_OFFSET;
 static float imu_yaw_print_deg = 0.0f;
 static int imu_yaw_print_count = 0;
 
+// 关闭 yaw 调试打印：状态机仍会积分 yaw，但不再刷终端。
+static const bool IMU_YAW_PRINT_ENABLE = false;
+
 // 每 5 次 20ms 中断打印一次，也就是约 100ms 一次。
 // 如果想每个控制周期都打印，把这个值改成 1。
 static const int IMU_YAW_PRINT_INTERVAL = 5;
@@ -256,7 +259,10 @@ void imu_yaw_print_task(zf_device_imu &imu_dev, float dt_s)
     {
         if (imu_yaw_print_state != IMU_YAW_WAIT_OFFSET)
         {
-            printf("[IMU_YAW] wait gyro offset\r\n");
+            if (IMU_YAW_PRINT_ENABLE)
+            {
+                printf("[IMU_YAW] wait gyro offset\r\n");
+            }
         }
         imu_yaw_print_state = IMU_YAW_WAIT_OFFSET;
         return;
@@ -267,7 +273,10 @@ void imu_yaw_print_task(zf_device_imu &imu_dev, float dt_s)
         imu_yaw_print_deg = 0.0f;
         imu_yaw_print_count = 0;
         imu_yaw_print_state = IMU_YAW_RUN;
-        printf("[IMU_YAW] start yaw=0.0\r\n");
+        if (IMU_YAW_PRINT_ENABLE)
+        {
+            printf("[IMU_YAW] start yaw=0.0\r\n");
+        }
     }
 
     if (imu_yaw_print_state == IMU_YAW_RUN)
@@ -276,7 +285,7 @@ void imu_yaw_print_task(zf_device_imu &imu_dev, float dt_s)
         imu_yaw_print_deg = imu_yaw_wrap_180(imu_yaw_print_deg + gyro_z_dps * dt_s);
 
         imu_yaw_print_count++;
-        if (imu_yaw_print_count >= IMU_YAW_PRINT_INTERVAL)
+        if (IMU_YAW_PRINT_ENABLE && imu_yaw_print_count >= IMU_YAW_PRINT_INTERVAL)
         {
             imu_yaw_print_count = 0;
             printf("[IMU_YAW] yaw=%.1f gz=%.1f\r\n", imu_yaw_print_deg, gyro_z_dps);
