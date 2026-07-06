@@ -24,6 +24,7 @@ static const float AVOID_TARGET_ANGLE_DEG = 45.0f;
 /* 原地左转速度：左轮反转、右轮正转。方向反了就对调符号。 */
 static const int16 AVOID_LEFT_SPEED = -60;
 static const int16 AVOID_RIGHT_SPEED = 60;
+static const int16 AVOID_HOLD_SPEED = 70;
 static const int AVOID_STOP_HOLD_TICKS = 25; /* 25 * 20ms = 0.5s */
 
 /* 当前默认开启绕行功能，等待视觉结果 0 触发。 */
@@ -119,8 +120,8 @@ bool avoid_control(void)
         else
         {
             /* 到达目标角度：停车，并进入保持停车状态。 */
-            diff_speedl_expect = 0;
-            diff_speedr_expect = 0;
+            diff_speedl_expect = AVOID_HOLD_SPEED;
+            diff_speedr_expect = AVOID_HOLD_SPEED;
             avoid_stop_ticks = 0;
             avoid_state = AVOID_STOPPED;
             avoid_print_state_once();
@@ -132,8 +133,8 @@ bool avoid_control(void)
     if (avoid_state == AVOID_STOPPED)
     {
         /* 停车状态持续接管电机，防止回到巡线后又继续跑。 */
-        diff_speedl_expect = 0;
-        diff_speedr_expect = 0;
+        diff_speedl_expect = AVOID_HOLD_SPEED;
+        diff_speedr_expect = AVOID_HOLD_SPEED;
         avoid_stop_ticks++;
         if (avoid_stop_ticks >= AVOID_STOP_HOLD_TICKS)
         {
