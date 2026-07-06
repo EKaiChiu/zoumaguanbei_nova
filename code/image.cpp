@@ -35,6 +35,31 @@ int Repair_Point_Xsite, Repair_Point_Ysite;                                     
 uint8_t *binar;                                                                     // 灰度图像数组指针
 ROIRegionTypedef LargestWhiteRegion;
 
+static void PrintRingStateIfChanged()
+{
+    static int last_ring_state = -1;
+    int state = ImageFlag.image_element_rings_flag;
+
+    if (state == last_ring_state)
+        return;
+
+    last_ring_state = state;
+    if (state >= 1 && state <= 9)
+    {
+        const char *side = "NONE";
+        if (ImageFlag.image_element_rings == 1)
+            side = "LEFT";
+        else if (ImageFlag.image_element_rings == 2)
+            side = "RIGHT";
+
+        printf("[RING] state=%d side=%s type=%d road=%d\r\n",
+               state,
+               side,
+               ImageFlag.ring_big_small,
+               ImageStatus.Road_type);
+    }
+}
+
 uint8 Half_Road_Wide[60] = // 直道半宽度
     {5,  6,  6,  6,  7,  7,  7,  8,  8,  8,  9,  9,  10, 10, 10, 11, 11, 12, 12, 12,
      13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 20, 20, 21, 21, 22, 22,
@@ -1795,6 +1820,8 @@ void Element_Handle()
         Element_Handle_Left_Rings();
     else if (ImageFlag.image_element_rings == 2)
         Element_Handle_Right_Rings();
+
+    PrintRingStateIfChanged();
 }
 
 // 丢双线的时候 处理无边行的补线
