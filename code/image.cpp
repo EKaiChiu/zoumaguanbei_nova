@@ -1088,17 +1088,16 @@ void Element_Judgment_Left_Rings()
 {
     // printf("Left_Line:%d,Right_Line:%d\n", ImageStatus.Left_Line, ImageStatus.Right_Line);
     //     Disf = 0;
-    if (ImageStatus.Right_Line > 2 || ImageStatus.Left_Line < 20 // 13
-        || ImageStatus.OFFLine > 2
+    if (ImageStatus.Right_Line > 4 || ImageStatus.Left_Line < 16 // 13
+        || ImageStatus.OFFLine > 4
         //  ||variance_acc>20
         // || Straight_Judge(2, 25, 45) > 1
-        || ImageStatus.WhiteLine > 5
+        || ImageStatus.WhiteLine > 8
         //            || (ImageDeal[48].RightBorder - ImageDeal[48].LeftBorder)<51
         // || ImageDeal[52].IsLeftFind == 'W'
         // || ImageDeal[53].IsLeftFind == 'W'
         // || ImageDeal[54].IsLeftFind == 'W'
-        || ImageDeal[55].IsLeftFind == 'W' || ImageDeal[56].IsLeftFind == 'W' || ImageDeal[57].IsLeftFind == 'W' ||
-        ImageDeal[58].IsLeftFind == 'W')
+        || ImageDeal[57].IsLeftFind == 'W' || ImageDeal[58].IsLeftFind == 'W')
         return;
     int ring_ysite = 20;
     //  uint8 Left_Less_Num = 0;
@@ -1107,7 +1106,7 @@ void Element_Judgment_Left_Rings()
     //   ceshi_flag = 1;
     for (int Ysite = 50; Ysite > ring_ysite; Ysite--)
     {
-        if (ImageDeal[Ysite].LeftBoundary_First - ImageDeal[Ysite - 1].LeftBoundary_First > 4)
+        if (ImageDeal[Ysite].LeftBoundary_First - ImageDeal[Ysite - 1].LeftBoundary_First > 3)
         {
             Left_RingsFlag_Point1_Ysite = Ysite;
             printf("左侧点1的Y值:%d\n", Left_RingsFlag_Point1_Ysite);
@@ -1116,7 +1115,7 @@ void Element_Judgment_Left_Rings()
     }
     for (int Ysite = 50; Ysite > ring_ysite; Ysite--)
     {
-        if (ImageDeal[Ysite + 1].LeftBoundary - ImageDeal[Ysite].LeftBoundary > 4)
+        if (ImageDeal[Ysite + 1].LeftBoundary - ImageDeal[Ysite].LeftBoundary > 3)
         {
             Left_RingsFlag_Point2_Ysite = Ysite;
             printf("左侧点2的Y值:%d\n", Left_RingsFlag_Point2_Ysite);
@@ -1149,7 +1148,7 @@ void Element_Judgment_Left_Rings()
 
     if (Left_RingsFlag_Point2_Ysite > Left_RingsFlag_Point1_Ysite + 1 && Ring_Help_Flag == 0)
     {
-        if (ImageStatus.Left_Line > 7) // 13
+        if (ImageStatus.Left_Line > 5) // 13
             Ring_Help_Flag = 1;
     }
     if (Left_RingsFlag_Point2_Ysite > Left_RingsFlag_Point1_Ysite + 1 && Ring_Help_Flag == 1 &&
@@ -1177,16 +1176,15 @@ void Element_Judgment_Left_Rings()
 //--------------------------------------------------------------
 void Element_Judgment_Right_Rings()
 {
-    if (ImageStatus.Left_Line > 2 || ImageStatus.Right_Line < 20 // 13
-        || ImageStatus.OFFLine > 2
+    if (ImageStatus.Left_Line > 4 || ImageStatus.Right_Line < 16 // 13
+        || ImageStatus.OFFLine > 4
         // || Straight_Judge(1, 20, 45) > 1
         //  ||variance_acc>18
-        || ImageStatus.WhiteLine > 5
+        || ImageStatus.WhiteLine > 8
         //        || (ImageDeal[48].RightBorder - ImageDeal[48].LeftBorder)<51
         //        || (ImageDeal[18].RightBoundary_First - ImageDeal[18].LeftBoundary_First)<70
         // || ImageDeal[52].IsRightFind == 'W'
-        || ImageDeal[53].IsRightFind == 'W' || ImageDeal[54].IsRightFind == 'W' || ImageDeal[55].IsRightFind == 'W' ||
-        ImageDeal[56].IsRightFind == 'W' || ImageDeal[57].IsRightFind == 'W' || ImageDeal[58].IsRightFind == 'W')
+        || ImageDeal[56].IsRightFind == 'W' || ImageDeal[57].IsRightFind == 'W' || ImageDeal[58].IsRightFind == 'W')
     {
         return;
     }
@@ -1195,7 +1193,7 @@ void Element_Judgment_Right_Rings()
     Right_RingsFlag_Point2_Ysite = 0;
     for (int Ysite = 58; Ysite > ring_ysite; Ysite--)
     {
-        if (ImageDeal[Ysite - 1].RightBoundary_First - ImageDeal[Ysite].RightBoundary_First > 4)
+        if (ImageDeal[Ysite - 1].RightBoundary_First - ImageDeal[Ysite].RightBoundary_First > 3)
         {
             Right_RingsFlag_Point1_Ysite = Ysite;
             break;
@@ -1203,7 +1201,7 @@ void Element_Judgment_Right_Rings()
     }
     for (int Ysite = 58; Ysite > ring_ysite; Ysite--)
     {
-        if (ImageDeal[Ysite].RightBoundary - ImageDeal[Ysite + 1].RightBoundary > 4)
+        if (ImageDeal[Ysite].RightBoundary - ImageDeal[Ysite + 1].RightBoundary > 3)
         {
             Right_RingsFlag_Point2_Ysite = Ysite;
             break;
@@ -1227,7 +1225,7 @@ void Element_Judgment_Right_Rings()
     }
     if (Right_RingsFlag_Point2_Ysite > Right_RingsFlag_Point1_Ysite + 1 && Ring_Help_Flag == 0)
     {
-        if (ImageStatus.Right_Line > 7)
+        if (ImageStatus.Right_Line > 5)
             Ring_Help_Flag = 1;
     }
     if (Right_RingsFlag_Point2_Ysite > Right_RingsFlag_Point1_Ysite + 1 && Ring_Help_Flag == 1 &&
