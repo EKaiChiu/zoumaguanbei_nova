@@ -649,7 +649,7 @@ void motor_diff_pid1()
         current_kp = diff_kp * 2.8f;
         current_kd = 0.25f;
     }
-    else if (abs_turn_error >= 8.0f)
+    else if (abs_turn_error >= 7.0f)
     {
         current_kp = 9.0f; // stronger bend turn
         current_kd = 0.45f;
@@ -667,7 +667,7 @@ void motor_diff_pid1()
     last_turn_error = turn_error;
 
     // 转向限幅：允许急弯接近外侧正转、内侧反转，但避免D项尖峰过猛
-    float turn_limit = 300.0f;
+    float turn_limit = 320.0f;
     if (turn_output > turn_limit)
         turn_output = turn_limit;
     if (turn_output < -turn_limit)
@@ -679,7 +679,7 @@ void motor_diff_pid1()
         filtered_turn_output = 0.0f;
     }
 
-    float max_turn_step = (abs_turn_error >= 8.0f) ? 105.0f : 28.0f;
+    float max_turn_step = (abs_turn_error >= 7.0f) ? 130.0f : 35.0f;
     float turn_delta = turn_output - filtered_turn_output;
     if (turn_delta > max_turn_step)
         turn_delta = max_turn_step;
