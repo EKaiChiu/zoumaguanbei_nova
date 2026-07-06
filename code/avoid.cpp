@@ -24,6 +24,7 @@ static const float AVOID_TARGET_ANGLE_DEG = 45.0f;
 /* 原地左转速度：左轮反转、右轮正转。方向反了就对调符号。 */
 static const int16 AVOID_LEFT_SPEED = -60;
 static const int16 AVOID_RIGHT_SPEED = 60;
+static const int AVOID_STOP_HOLD_TICKS = 25; /* 25 * 20ms = 0.5s */
 
 /* 当前默认开启绕行功能，等待视觉结果 0 触发。 */
 static AvoidState avoid_state = AVOID_IDLE;
@@ -31,6 +32,7 @@ static int latest_vision_result = -1;
 
 /* 从进入左转状态开始累计的相对角度，单位：度。 */
 static float avoid_angle_deg = 0.0f;
+static int avoid_stop_ticks = 0;
 static int printed_state = -1;
 
 static void avoid_print_state_once(void)
@@ -53,6 +55,7 @@ void avoid_init(void)
     avoid_state = AVOID_IDLE;
     latest_vision_result = -1;
     avoid_angle_deg = 0.0f;
+    avoid_stop_ticks = 0;
     printed_state = -1;
 }
 
@@ -61,6 +64,7 @@ void avoid_set_enabled(bool enable)
     avoid_state = enable ? AVOID_IDLE : AVOID_DISABLED;
     latest_vision_result = -1;
     avoid_angle_deg = 0.0f;
+    avoid_stop_ticks = 0;
     printed_state = -1;
     printf("[AVOID] %s\r\n", enable ? "enabled" : "disabled");
 }
@@ -90,6 +94,7 @@ bool avoid_control(void)
         avoid_state = AVOID_TURN_LEFT_45;
         latest_vision_result = -1;
         avoid_angle_deg = 0.0f;
+        avoid_stop_ticks = 0;
         printed_state = -1;
     }
 
@@ -116,6 +121,7 @@ bool avoid_control(void)
             /* 到达目标角度：停车，并进入保持停车状态。 */
             diff_speedl_expect = 0;
             diff_speedr_expect = 0;
+            avoid_stop_ticks = 0;
             avoid_state = AVOID_STOPPED;
             avoid_print_state_once();
         }
@@ -128,6 +134,16 @@ bool avoid_control(void)
         /* 停车状态持续接管电机，防止回到巡线后又继续跑。 */
         diff_speedl_expect = 0;
         diff_speedr_expect = 0;
+        avoid_stop_ticks++;
+        if (avoid_stop_ticks >= AVOID_STOP_HOLD_TICKS)
+        {
+            avoid_state = AVOID_IDLE;
+            latest_vision_result = -1;
+            avoid_angle_deg = 0.0f;
+            avoid_stop_ticks = 0;
+            printed_state = -1;
+            return false;
+        }
         return true;
     }
 
