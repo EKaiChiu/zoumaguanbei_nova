@@ -43,6 +43,11 @@ static void avoid_print_state_once(void)
     }
 }
 
+static bool avoid_is_target_result(int result)
+{
+    return result == 0 || result == 1 || result == 2;
+}
+
 void avoid_init(void)
 {
     avoid_state = AVOID_IDLE;
@@ -79,8 +84,8 @@ bool avoid_control(void)
         return false;
     }
 
-    /* 触发条件：绕行开启，并且视觉识别输出为 0。 */
-    if (avoid_state == AVOID_IDLE && latest_vision_result == 0)
+    /* 触发条件：绕行开启，并且视觉识别输出为 0/1/2。 */
+    if (avoid_state == AVOID_IDLE && avoid_is_target_result(latest_vision_result))
     {
         avoid_state = AVOID_TURN_LEFT_45;
         latest_vision_result = -1;
