@@ -1,5 +1,6 @@
 #include "imu660.hpp"
 #include <math.h>
+#include <stdio.h>
 
 #ifndef PI
 #define PI 3.14159265358979f
@@ -211,3 +212,74 @@ float get_acc_z_g(zf_device_imu &imu_dev)
 float get_roll(void)  { return euler.roll; }
 float get_pitch(void) { return euler.pitch; }
 float get_yaw(void)   { return euler.yaw; }
+
+// ==================== Yaw 实时打印状态机 ====================
+
+enum ImuYawPrintState
+{
+    IMU_YAW_WAIT_OFFSET = 0, // 等待陀螺仪零偏校准完成
+    IMU_YAW_INIT,            // 初始化：把本次调试的相对 yaw 清零
+    IMU_YAW_RUN,             // 运行：持续积分 Z 轴角速度并打印 yaw
+};
+
+static ImuYawPrintState imu_yaw_print_state = IMU_YAW_WAIT_OFFSET;
+static float imu_yaw_print_deg = 0.0f;
+static int imu_yaw_print_count = 0;
+
+// 每 5 次 20ms 中断打印一次，也就是约 100ms 一次。
+// 如果想每个控制周期都打印，把这个值改成 1。
+static const int IMU_YAW_PRINT_INTERVAL = 5;
+
+static float imu_yaw_wrap_180(float yaw)
+{
+    while (yaw > 180.0f)
+    {
+        yaw -= 360.0f;
+    }
+    while (yaw < -180.0f)
+    {
+        yaw += 360.0f;
+    }
+    return yaw;
+}
+
+void imu_yaw_print_reset(void)
+{
+    imu_yaw_print_state = IMU_YAW_INIT;
+    imu_yaw_print_deg = 0.0f;
+    imu_yaw_print_count = 0;
+}
+
+void imu_yaw_print_task(zf_device_imu &imu_dev, float dt_s)
+{
+    if (!gyro_offset_flag)
+    {
+        if (imu_yaw_print_state != IMU_YAW_WAIT_OFFSET)
+        {
+            printf("[IMU_YAW] wait gyro offset\r\n");
+        }
+        imu_yaw_print_state = IMU_YAW_WAIT_OFFSET;
+        return;
+    }
+
+    if (imu_yaw_print_state == IMU_YAW_WAIT_OFFSET || imu_yaw_print_state == IMU_YAW_INIT)
+    {
+        imu_yaw_print_deg = 0.0f;
+        imu_yaw_print_count = 0;
+        imu_yaw_print_state = IMU_YAW_RUN;
+        printf("[IMU_YAW] start yaw=0.0\r\n");
+    }
+
+    if (imu_yaw_print_state == IMU_YAW_RUN)
+    {
+        float gyro_z_dps = get_gyro_z_dps(imu_dev);
+        imu_yaw_print_deg = imu_yaw_wrap_180(imu_yaw_print_deg + gyro_z_dps * dt_s);
+
+        imu_yaw_print_count++;
+        if (imu_yaw_print_count >= IMU_YAW_PRINT_INTERVAL)
+        {
+            imu_yaw_print_count = 0;
+            printf("[IMU_YAW] yaw=%.1f gz=%.1f\r\n", imu_yaw_print_deg, gyro_z_dps);
+        }
+    }
+}

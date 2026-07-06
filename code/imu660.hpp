@@ -159,4 +159,18 @@ float get_roll(void);
 float get_pitch(void);
 float get_yaw(void);
 
+/*
+函数名称：IMU yaw 打印状态机复位
+功能说明：把相对 yaw 重新归零，重新进入初始化状态。
+*/
+void imu_yaw_print_reset(void);
+
+/*
+函数名称：IMU yaw 打印状态机
+功能说明：按调用周期积分 Z 轴角速度，实时维护相对 yaw，并周期打印 yaw 值。
+参数说明：imu_dev - 已初始化的 IMU 对象；dt_s - 本函数调用周期，单位秒。
+example：    imu_yaw_print_task(imu_dev, 0.02f);
+*/
+void imu_yaw_print_task(zf_device_imu &imu_dev, float dt_s);
+
 #endif // __IMU660_HPP__

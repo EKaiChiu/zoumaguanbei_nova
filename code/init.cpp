@@ -16,6 +16,7 @@ volatile int image_ready_flag = 0;
 void Interrupt()//中断函数
 {
   if(!image_ready_flag) return;  // 🛡️ 图像没就绪时不执行电机控制！
+  imu_yaw_print_task(imu_dev, 0.02f);  // IMU yaw debug task, 20ms period
   motor_control();         // 核心：每5ms执行一次差速和电机PID
 }
 

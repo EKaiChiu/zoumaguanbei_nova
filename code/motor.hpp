@@ -17,6 +17,8 @@ extern zf_driver_pwm motor2_pwm_2;   // 添加这行
 
 extern int test_mode;
 extern int mode2_pwm;
+extern int16 diff_speedl_expect;
+extern int16 diff_speedr_expect;
 
 void encoder_test();
 

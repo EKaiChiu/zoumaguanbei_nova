@@ -41,6 +41,7 @@
 #include "config.hpp"
 #include "ips200_draw.hpp"
 #include "CarVision.hpp"
+#include "avoid.hpp"
 #include "menu.hpp"
 
 // ====================== 网络配置宏定义 ======================
@@ -279,6 +280,7 @@ int main()
                 if (vision_result != -1)
                 {
                     printf("vision_get() result: %d\n", vision_result);
+                    avoid_set_vision_result(vision_result);
                 }
             }
         }

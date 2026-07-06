@@ -1,4 +1,5 @@
 #include "motor.hpp"
+#include "avoid.hpp"
 #include "config.hpp"
 zf_driver_gpio motor1_gpio(motor1_dir, O_RDWR);
 zf_driver_gpio motor2_gpio(motor2_dir, O_RDWR);
@@ -473,6 +474,15 @@ void motor_control()
     // ════════════════════════════════════════════════
     // 模式0：完整寻迹（正常使用）
     // ════════════════════════════════════════════════
+
+    if (avoid_control())
+    {
+        speed_goal_l = (float)diff_speedl_expect;
+        speed_goal_r = (float)diff_speedr_expect;
+        motor_pid_left();
+        motor_pid_right();
+        return;
+    }
 
     motor_diff_pid1(); // 差速计算
 
