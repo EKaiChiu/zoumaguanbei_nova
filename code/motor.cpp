@@ -646,7 +646,7 @@ void motor_diff_pid1()
     // 图像偏差（根据实际调整中线值）
     float turn_error = 40 - ImageStatus.Det_True;
     // 死区控制
-    if (turn_error > -1.5f && turn_error < 1.5f)
+    if (turn_error > -1.0f && turn_error < 1.0f)
     {
         turn_error = 0;
     }
@@ -654,15 +654,15 @@ void motor_diff_pid1()
     float abs_turn_error = abs_float(turn_error);
     float current_kp = diff_kp;
     float current_kd = 0.20f;
-    if (abs_turn_error <= 4.0f)
+    if (abs_turn_error <= 3.5f)
     {
         current_kp = diff_kp * 3.2f;
         current_kd = 0.25f;
     }
-    else if (abs_turn_error >= 5.5f)
+    else if (abs_turn_error >= 4.5f)
     {
-        current_kp = 10.5f; // stronger bend turn
-        current_kd = 0.50f;
+        current_kp = 12.5f; // stronger bend turn
+        current_kd = 0.42f;
     }
     else
     {
@@ -677,7 +677,7 @@ void motor_diff_pid1()
     last_turn_error = turn_error;
 
     // 转向限幅：允许急弯接近外侧正转、内侧反转，但避免D项尖峰过猛
-    float turn_limit = 360.0f;
+    float turn_limit = 420.0f;
     if (turn_output > turn_limit)
         turn_output = turn_limit;
     if (turn_output < -turn_limit)
@@ -689,22 +689,26 @@ void motor_diff_pid1()
         filtered_turn_output = 0.0f;
     }
 
-    float max_turn_step = (abs_turn_error >= 5.5f) ? 160.0f : 45.0f;
+    float max_turn_step = (abs_turn_error >= 4.5f) ? 210.0f : 55.0f;
     float turn_delta = turn_output - filtered_turn_output;
     if (turn_delta > max_turn_step)
         turn_delta = max_turn_step;
     if (turn_delta < -max_turn_step)
         turn_delta = -max_turn_step;
     filtered_turn_output += turn_delta;
-    filtered_turn_output = 0.8f * filtered_turn_output + 0.2f * turn_output;
+    filtered_turn_output = 0.65f * filtered_turn_output + 0.35f * turn_output;
     if (abs_turn_error <= 3.0f)
     {
         filtered_turn_output *= 0.35f;
     }
 
-    int current_base_speed = 175 - (int)(abs_turn_error * 4.5f);
-    if (current_base_speed < 45)
-        current_base_speed = 45;
+    int current_base_speed = 165 - (int)(abs_turn_error * 5.0f);
+    if (abs_turn_error >= 12.0f && current_base_speed > 55)
+        current_base_speed = 55;
+    else if (abs_turn_error >= 8.0f && current_base_speed > 75)
+        current_base_speed = 75;
+    if (current_base_speed < 35)
+        current_base_speed = 35;
 
     // 计算左右轮目标速度
     diff_speedl_expect = current_base_speed + (int)filtered_turn_output;
