@@ -1719,8 +1719,14 @@ void Element_Handle_Right_Rings()
     {
         for (int Ysite = 59; Ysite > ImageStatus.OFFLine; Ysite--)
         {
-            ImageDeal[Ysite].Center = ImageDeal[Ysite].LeftBorder + Half_Road_Wide[Ysite];
+            ImageDeal[Ysite].Center = ImageDeal[Ysite].LeftBorder + Half_Road_Wide[Ysite] + 5;
+            if (ImageDeal[Ysite].Center > 79)
+                ImageDeal[Ysite].Center = 79;
         }
+        printf("[RINGDBG][R][PATCH] enter center59=%d left59=%d right59=%d\r\n",
+               ImageDeal[59].Center,
+               ImageDeal[59].LeftBorder,
+               ImageDeal[59].RightBorder);
     }
 
     // 进环 切外
@@ -1771,7 +1777,7 @@ void Element_Handle_Right_Rings()
                 //                if(ImageFlag.ring_big_small==2)// 小环岛补中线
                 //                    ImageDeal[Ysite].Center=ImageDeal[Ysite].LeftBorder+Half_Bend_Wide[Ysite];// 中线
                 //                else// 大环岛补中线
-                ImageDeal[Ysite].Center = (ImageDeal[Ysite].LeftBorder + ImageDeal[Ysite].RightBorder) / 2; // 中线
+                ImageDeal[Ysite].Center = ImageDeal[Ysite].LeftBorder + Half_Bend_Wide[Ysite]; // 中线
                 if (ImageDeal[Ysite].Center > 79)
                     ImageDeal[Ysite].Center = 79;
             }
@@ -1788,8 +1794,7 @@ void Element_Handle_Right_Rings()
                         //                         ImageDeal[Ysite].Center=ImageDeal[Ysite].LeftBorder+Half_Bend_Wide[Ysite];//
                         //                         中线
                         //                     else// 大环岛补中线
-                        ImageDeal[Ysite].Center =
-                            (ImageDeal[Ysite].LeftBorder + ImageDeal[Ysite].RightBorder) / 2; // 中线
+                        ImageDeal[Ysite].Center = ImageDeal[Ysite].LeftBorder + Half_Bend_Wide[Ysite]; // 中线
                         if (ImageDeal[Ysite].Center > 79)
                             ImageDeal[Ysite].Center = 79;
                         if (ImageDeal[Ysite].Center < 5)
