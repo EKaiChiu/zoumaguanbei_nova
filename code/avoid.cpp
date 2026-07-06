@@ -16,8 +16,8 @@ enum AvoidState
 
 static const float AVOID_CONTROL_DT_S = 0.02f;
 static const float AVOID_TARGET_ANGLE_DEG = 45.0f;
-static const int16 AVOID_LEFT_SPEED = -60;
-static const int16 AVOID_RIGHT_SPEED = 60;
+static const int16 AVOID_LEFT_SPEED = -140;
+static const int16 AVOID_RIGHT_SPEED = 140;
 
 static AvoidState avoid_state = AVOID_IDLE;
 static int latest_vision_result = -1;
