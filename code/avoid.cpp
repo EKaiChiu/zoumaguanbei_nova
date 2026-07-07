@@ -12,7 +12,6 @@ enum AvoidState
     AVOID_DISABLED = 0,
     AVOID_IDLE,
     AVOID_TURN_LEFT_45,
-    AVOID_STRAIGHT_AFTER_LEFT,
     AVOID_TURN_RIGHT_TO_ZERO,
     AVOID_STRAIGHT_AFTER_ZERO,
     AVOID_TURN_RIGHT_TO_MINUS_45,
@@ -23,11 +22,11 @@ static const float AVOID_LEFT_TARGET_DEG = 45.0f;
 static const float AVOID_ZERO_TARGET_DEG = 0.0f;
 static const float AVOID_RIGHT_TARGET_DEG = -45.0f;
 static const int AVOID_STRAIGHT_TICKS = 25;
-static const int16 AVOID_TURN_LEFT_SPEED_L = -140;
-static const int16 AVOID_TURN_LEFT_SPEED_R = 140;
-static const int16 AVOID_TURN_RIGHT_SPEED_L = 140;
-static const int16 AVOID_TURN_RIGHT_SPEED_R = -140;
-static const int16 AVOID_STRAIGHT_SPEED = 140;
+static const int16 AVOID_TURN_LEFT_SPEED_L = -160;
+static const int16 AVOID_TURN_LEFT_SPEED_R = 160;
+static const int16 AVOID_TURN_RIGHT_SPEED_L = 160;
+static const int16 AVOID_TURN_RIGHT_SPEED_R = -160;
+static const int16 AVOID_STRAIGHT_SPEED = 160;
 
 static AvoidState avoid_state = AVOID_DISABLED;
 static int latest_vision_result = -1;
@@ -125,26 +124,10 @@ bool avoid_control(void)
             return true;
         }
 
-        avoid_state = AVOID_STRAIGHT_AFTER_LEFT;
-        avoid_straight_ticks = 0;
+        avoid_state = AVOID_TURN_RIGHT_TO_ZERO;
         printed_state = -1;
-        diff_speedl_expect = AVOID_STRAIGHT_SPEED;
-        diff_speedr_expect = AVOID_STRAIGHT_SPEED;
-        return true;
-    }
-
-    if (avoid_state == AVOID_STRAIGHT_AFTER_LEFT)
-    {
-        avoid_angle_deg += get_gyro_z_dps(imu_dev) * AVOID_CONTROL_DT_S;
-        avoid_straight_ticks++;
-        diff_speedl_expect = AVOID_STRAIGHT_SPEED;
-        diff_speedr_expect = AVOID_STRAIGHT_SPEED;
-
-        if (avoid_straight_ticks >= AVOID_STRAIGHT_TICKS)
-        {
-            avoid_state = AVOID_TURN_RIGHT_TO_ZERO;
-            printed_state = -1;
-        }
+        diff_speedl_expect = AVOID_TURN_RIGHT_SPEED_L;
+        diff_speedr_expect = AVOID_TURN_RIGHT_SPEED_R;
         return true;
     }
 
