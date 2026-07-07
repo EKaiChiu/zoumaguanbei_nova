@@ -6,7 +6,7 @@
 void beep_short(void)
 {
     beep_gpio.set_level(1);
-    system_delay_ms(50);
+    system_delay_ms(100);
     beep_gpio.set_level(0);
 }
 

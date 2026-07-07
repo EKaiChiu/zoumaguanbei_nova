@@ -1,5 +1,11 @@
 #include "image.hpp"
 
+// ======================调试打印区======================
+#define Cross_State_Print 1 //十字环岛进入
+
+
+
+
 static uint8 border_point;
 static uint8 top_point;
 
@@ -56,10 +62,7 @@ static void PrintRingStateIfChanged()
         else if (ImageFlag.image_element_rings == 2)
             side = "RIGHT";
 
-        printf("[RING] state=%d side=%s type=%d road=%d\r\n",
-               state,
-               side,
-               ImageFlag.ring_big_small,
+        printf("[RING] state=%d side=%s type=%d road=%d\r\n", state, side, ImageFlag.ring_big_small,
                ImageStatus.Road_type);
     }
 }
@@ -1149,9 +1152,8 @@ void Element_Judgment_Left_Rings()
             Ring_Help_Flag = 1;
         }
     }
-    if (Left_RingsFlag_Point1_Ysite > 0 &&
-        Left_RingsFlag_Point2_Ysite > Left_RingsFlag_Point1_Ysite + 1 && Ring_Help_Flag == 1 &&
-        ImageFlag.image_element_rings_flag == 0)
+    if (Left_RingsFlag_Point1_Ysite > 0 && Left_RingsFlag_Point2_Ysite > Left_RingsFlag_Point1_Ysite + 1 &&
+        Ring_Help_Flag == 1 && ImageFlag.image_element_rings_flag == 0)
     {
 
         ImageFlag.image_element_rings = 1;
@@ -1159,8 +1161,7 @@ void Element_Judgment_Left_Rings()
         ImageFlag.ring_big_small = 1;
 
         ImageStatus.Road_type = LeftCirque;
-        printf("[RINGDBG][L] ENTER left ring p1=%d p2=%d\r\n",
-               Left_RingsFlag_Point1_Ysite,
+        printf("[RINGDBG][L] ENTER left ring p1=%d p2=%d\r\n", Left_RingsFlag_Point1_Ysite,
                Left_RingsFlag_Point2_Ysite);
         // gpio_set_level(P20_8, 0);
         // wireless_uart_send_byte(9);
@@ -1233,9 +1234,8 @@ void Element_Judgment_Right_Rings()
             Ring_Help_Flag = 1;
         }
     }
-    if (Right_RingsFlag_Point1_Ysite > 0 &&
-        Right_RingsFlag_Point2_Ysite > Right_RingsFlag_Point1_Ysite + 1 && Ring_Help_Flag == 1 &&
-        ImageFlag.image_element_rings_flag == 0)
+    if (Right_RingsFlag_Point1_Ysite > 0 && Right_RingsFlag_Point2_Ysite > Right_RingsFlag_Point1_Ysite + 1 &&
+        Ring_Help_Flag == 1 && ImageFlag.image_element_rings_flag == 0)
     {
 
         ImageFlag.image_element_rings = 2;
@@ -1243,8 +1243,7 @@ void Element_Judgment_Right_Rings()
         ImageFlag.ring_big_small = 1; // 小环
         SystemData.Stop = 1;
         ImageStatus.Road_type = RightCirque;
-        printf("[RINGDBG][R] ENTER right ring p1=%d p2=%d\r\n",
-               Right_RingsFlag_Point1_Ysite,
+        printf("[RINGDBG][R] ENTER right ring p1=%d p2=%d\r\n", Right_RingsFlag_Point1_Ysite,
                Right_RingsFlag_Point2_Ysite);
         //        flag_ceshi++;
         //        gpio_set_level(Bee1p, 1);
@@ -1679,10 +1678,8 @@ void Element_Handle_Right_Rings()
             if (ImageDeal[Ysite].Center > 79)
                 ImageDeal[Ysite].Center = 79;
         }
-        printf("[RINGDBG][R][PATCH] enter center59=%d left59=%d right59=%d\r\n",
-               ImageDeal[59].Center,
-               ImageDeal[59].LeftBorder,
-               ImageDeal[59].RightBorder);
+        printf("[RINGDBG][R][PATCH] enter center59=%d left59=%d right59=%d\r\n", ImageDeal[59].Center,
+               ImageDeal[59].LeftBorder, ImageDeal[59].RightBorder);
     }
 
     // 进环 切外
@@ -1812,7 +1809,7 @@ void Element_Handle_Right_Rings()
     }
 }
 
-// 元素测试函数
+// 丢线计数
 static int CountCrossLostRows(int *first_lost_row, int *last_lost_row)
 {
     int lost_rows = 0;
@@ -1839,9 +1836,7 @@ static int CountCrossBottomValidRows(void)
 
     for (int row = 59; row >= 53; row--)
     {
-        if (ImageDeal[row].IsLeftFind == 'T' &&
-            ImageDeal[row].IsRightFind == 'T' &&
-            ImageDeal[row].Wide > 14)
+        if (ImageDeal[row].IsLeftFind == 'T' && ImageDeal[row].IsRightFind == 'T' && ImageDeal[row].Wide > 14)
         {
             valid_rows++;
         }
@@ -1849,14 +1844,11 @@ static int CountCrossBottomValidRows(void)
 
     return valid_rows;
 }
-
+// 十字判断
 static void Element_Judgment_Cross(void)
 {
-    if (ImageFlag.image_element_rings != 0 ||
-        ImageStatus.Road_type == LeftCirque ||
-        ImageStatus.Road_type == RightCirque ||
-        ImageStatus.Road_type == Ramp ||
-        ImageStatus.Road_type == Barn_in ||
+    if (ImageFlag.image_element_rings != 0 || ImageStatus.Road_type == LeftCirque ||
+        ImageStatus.Road_type == RightCirque || ImageStatus.Road_type == Ramp || ImageStatus.Road_type == Barn_in ||
         ImageStatus.Road_type == Barn_out)
     {
         return;
@@ -1875,14 +1867,14 @@ static void Element_Judgment_Cross(void)
         return;
     }
 
-    if (bottom_valid_rows >= 4 &&
-        lost_rows >= 8 &&
-        lost_span >= 10 &&
-        ImageStatus.Left_Line >= 6 &&
-        ImageStatus.Right_Line >= 6 &&
-        ImageStatus.OFFLine <= 18)
+    if (bottom_valid_rows >= 4 && lost_rows >= 8 && lost_span >= 10 && ImageStatus.Left_Line >= 6 &&
+        ImageStatus.Right_Line >= 6 && ImageStatus.OFFLine <= 18)
     {
         ImageStatus.Road_type = Cross_ture;
+        if(Cross_State_Print)
+        {
+            printf("[CROSS] ENTER cross road\r\n");
+        }
     }
 }
 
@@ -2018,7 +2010,6 @@ static void RouteFilter(void)
         if (ImageDeal[Ysite].IsLeftFind == 'W' && ImageDeal[Ysite].IsRightFind == 'W')
             RepairCrossLineFromCenter(Ysite);
     }
-
 }
 
 // 绘制边界线 用于调试
@@ -2064,8 +2055,8 @@ void GetDet()
 {
     float DetTemp = 0.0f;
     float UnitAll = 0.0f;
-    const int det_start_row = 5;  // original row 10 after 2x compression
-    const int det_end_row = 55;   // original row 110 after 2x compression
+    const int det_start_row = 5; // original row 10 after 2x compression
+    const int det_end_row = 55;  // original row 110 after 2x compression
     const int det_mid_row = 30;
 
     int start_row = det_start_row;

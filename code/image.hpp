@@ -62,15 +62,11 @@ typedef struct {
 typedef enum {
   Normol,       //无任何特征
   Straight,     ////直道
-  Cross,        ////十字
+  Cross,        
   Ramp,         //坡道
   LeftCirque,   ////左圆环
   RightCirque,  ////右圆环
-  Forkin,       //岔路进口
-  Forkout,      //岔路出口
-  Barn_out,     //出库
-  Barn_in,      //入库
-  Cross_ture,
+  Cross_ture,   ////十字
 } RoadType_e;
 
 typedef struct {
@@ -248,6 +244,7 @@ typedef struct {
 
 
 //int Limit(int num, int numH, int numL);
+extern bool Cross_State_Print;                         // 十字路口检测打印开关
 extern ImageStatustypedef ImageStatus;                //图像的全局变量
 extern SystemDatatypdef SystemData;
 extern ImageDealDatatypedef ImageDeal[60];                //记录单行的信息

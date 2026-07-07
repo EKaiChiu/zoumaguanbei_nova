@@ -44,14 +44,18 @@
 #include "avoid.hpp"
 #include "beep.hpp"
 #include "menu.hpp"
+// ====================== 全局宏定义 ======================
+#define SERVER_IP "10.18.55.68"
 
 // ====================== 网络配置宏定义 ======================
-#define SERVER_IP "10.18.55.68"
 #define PORT 8086
 #define IMAGE_TRANSFER_INTERVAL 3
 #define IMAGE_TRANSFER_DEFAULT_STATE IMAGE_TRANSFER_OFF
 
 // #define DEBUG_PRINT
+
+
+
 // ======================清理退出函数======================
 void sigint_handler(int sig);
 void cleanup();
