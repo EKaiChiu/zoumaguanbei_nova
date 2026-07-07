@@ -42,6 +42,7 @@
 #include "ips200_draw.hpp"
 #include "CarVision.hpp"
 #include "avoid.hpp"
+#include "beep.hpp"
 #include "menu.hpp"
 
 // ====================== 网络配置宏定义 ======================
@@ -277,10 +278,19 @@ int main()
             {
                 vision_frame_counter = 0;
                 int vision_result = vision_get_from_rgb565(rgb_image, UVC_WIDTH, UVC_HEIGHT);
+                static bool vision_beep_latched = false;
                 if (vision_result != -1)
                 {
                     printf("vision_get() result: %d\n", vision_result);
-                    avoid_set_vision_result(vision_result);
+                    if (!vision_beep_latched)
+                    {
+                        beep_short();
+                        vision_beep_latched = true;
+                    }
+                }
+                else
+                {
+                    vision_beep_latched = false;
                 }
             }
         }

@@ -7,6 +7,7 @@ extern zf_device_uvc uvc_cam;
 extern zf_device_ips200 ips200;
 extern zf_device_imu imu_dev;
 extern zf_driver_pit pit_timer;
+extern zf_driver_gpio beep_gpio;
 
 
 

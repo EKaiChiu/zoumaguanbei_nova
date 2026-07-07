@@ -19,7 +19,7 @@ static const float AVOID_TARGET_ANGLE_DEG = 45.0f;
 static const int16 AVOID_LEFT_SPEED = -140;
 static const int16 AVOID_RIGHT_SPEED = 140;
 
-static AvoidState avoid_state = AVOID_IDLE;
+static AvoidState avoid_state = AVOID_DISABLED;
 static int latest_vision_result = -1;
 static float avoid_angle_deg = 0.0f;
 static int printed_state = -1;
@@ -40,7 +40,7 @@ static bool avoid_is_target_result(int result)
 
 void avoid_init(void)
 {
-    avoid_state = AVOID_IDLE;
+    avoid_state = AVOID_DISABLED;
     latest_vision_result = -1;
     avoid_angle_deg = 0.0f;
     printed_state = -1;
