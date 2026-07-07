@@ -12,8 +12,9 @@ enum AvoidState
     AVOID_DISABLED = 0,
     AVOID_IDLE,
     AVOID_TURN_LEFT_45,
-    AVOID_TURN_RIGHT_TO_ZERO,
     AVOID_STRAIGHT_AFTER_LEFT,
+    AVOID_TURN_RIGHT_TO_ZERO,
+    AVOID_STRAIGHT_AFTER_ZERO,
     AVOID_TURN_RIGHT_TO_MINUS_45,
 };
 
@@ -124,24 +125,6 @@ bool avoid_control(void)
             return true;
         }
 
-        avoid_state = AVOID_TURN_RIGHT_TO_ZERO;
-        printed_state = -1;
-        diff_speedl_expect = AVOID_TURN_RIGHT_SPEED_L;
-        diff_speedr_expect = AVOID_TURN_RIGHT_SPEED_R;
-        return true;
-    }
-
-    if (avoid_state == AVOID_TURN_RIGHT_TO_ZERO)
-    {
-        avoid_angle_deg += get_gyro_z_dps(imu_dev) * AVOID_CONTROL_DT_S;
-
-        if (avoid_angle_deg > AVOID_ZERO_TARGET_DEG)
-        {
-            diff_speedl_expect = AVOID_TURN_RIGHT_SPEED_L;
-            diff_speedr_expect = AVOID_TURN_RIGHT_SPEED_R;
-            return true;
-        }
-
         avoid_state = AVOID_STRAIGHT_AFTER_LEFT;
         avoid_straight_ticks = 0;
         printed_state = -1;
@@ -151,6 +134,39 @@ bool avoid_control(void)
     }
 
     if (avoid_state == AVOID_STRAIGHT_AFTER_LEFT)
+    {
+        avoid_angle_deg += get_gyro_z_dps(imu_dev) * AVOID_CONTROL_DT_S;
+        avoid_straight_ticks++;
+        diff_speedl_expect = AVOID_STRAIGHT_SPEED;
+        diff_speedr_expect = AVOID_STRAIGHT_SPEED;
+
+        if (avoid_straight_ticks >= AVOID_STRAIGHT_TICKS)
+        {
+            avoid_state = AVOID_TURN_RIGHT_TO_ZERO;
+            printed_state = -1;
+        }
+        return true;
+    }
+
+    if (avoid_state == AVOID_TURN_RIGHT_TO_ZERO)
+    {
+        avoid_angle_deg += get_gyro_z_dps(imu_dev) * AVOID_CONTROL_DT_S;
+        if (avoid_angle_deg > AVOID_ZERO_TARGET_DEG)
+        {
+            diff_speedl_expect = AVOID_TURN_RIGHT_SPEED_L;
+            diff_speedr_expect = AVOID_TURN_RIGHT_SPEED_R;
+            return true;
+        }
+
+        avoid_state = AVOID_STRAIGHT_AFTER_ZERO;
+        avoid_straight_ticks = 0;
+        printed_state = -1;
+        diff_speedl_expect = AVOID_STRAIGHT_SPEED;
+        diff_speedr_expect = AVOID_STRAIGHT_SPEED;
+        return true;
+    }
+
+    if (avoid_state == AVOID_STRAIGHT_AFTER_ZERO)
     {
         avoid_angle_deg += get_gyro_z_dps(imu_dev) * AVOID_CONTROL_DT_S;
         avoid_straight_ticks++;
