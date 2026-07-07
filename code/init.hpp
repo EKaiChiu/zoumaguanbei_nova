@@ -15,6 +15,7 @@ extern uint8 beep;
 /*****************�ⲿ����������*****************/
 void init_all();
 void start_motor_timer();  // 🛡️ 首帧后启动电机控制
+void stop_motor_timer();
 
 
 #endif /* init_hpp */

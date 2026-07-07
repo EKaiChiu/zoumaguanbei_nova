@@ -44,6 +44,9 @@
 #include "avoid.hpp"
 #include "beep.hpp"
 #include "menu.hpp"
+#include "motor.hpp"
+
+#include <time.h>
 
 // ====================== 网络配置宏定义 ======================
 #define SERVER_IP "10.18.55.68"
@@ -52,6 +55,11 @@
 #define IMAGE_TRANSFER_DEFAULT_STATE IMAGE_TRANSFER_OFF
 
 // #define DEBUG_PRINT
+#define TEST_MAIN_DISABLE_NORMAL 1
+#define TEST_MAIN_LINE_SPEED 150
+#define TEST_MAIN_LINE_BEFORE_MS 2000
+#define TEST_MAIN_LINE_AFTER_MS 2000
+#define TEST_MAIN_AVOID_TIMEOUT_MS 12000
 
 // ======================清理退出函数======================
 void sigint_handler(int sig);
@@ -106,6 +114,95 @@ static uint32 read_wrapper(uint8 *buff, uint32 length)
 }
 
 // **************************** 主函数入口 ****************************
+static uint32_t test_now_ms(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint32_t)(ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
+}
+
+static bool test_update_line_frame(void)
+{
+    if (uvc_cam.wait_image_refresh() < 0)
+    {
+        system_delay_ms(1);
+        return false;
+    }
+
+    ImageProcess();
+    return true;
+}
+
+static void test_run_line_ms(uint32_t duration_ms)
+{
+    uint32_t start_ms = test_now_ms();
+    while ((uint32_t)(test_now_ms() - start_ms) < duration_ms)
+    {
+        test_update_line_frame();
+    }
+}
+
+#if TEST_MAIN_DISABLE_NORMAL
+int main()
+{
+    signal(SIGINT, sigint_handler);
+
+    init_all();
+    Data_Settings();
+    atexit(cleanup);
+    signal(SIGINT, sigint_handler);
+
+    test_mode = 0;
+    motor_set_line_base_speed(TEST_MAIN_LINE_SPEED);
+    avoid_set_enabled(true);
+
+    printf("[TEST] temporary main enabled\r\n");
+    printf("[TEST] line speed=%d, line before=%dms, line after=%dms\r\n",
+           TEST_MAIN_LINE_SPEED,
+           TEST_MAIN_LINE_BEFORE_MS,
+           TEST_MAIN_LINE_AFTER_MS);
+
+    while (!test_update_line_frame())
+    {
+        system_delay_ms(1);
+    }
+
+    start_motor_timer();
+    printf("[TEST] line follow before avoid\r\n");
+    test_run_line_ms(TEST_MAIN_LINE_BEFORE_MS);
+
+    printf("[TEST] beep and force avoid\r\n");
+    beep_short();
+    avoid_force_start();
+
+    uint32_t avoid_start_ms = test_now_ms();
+    while (avoid_get_state() != 1 &&
+           (uint32_t)(test_now_ms() - avoid_start_ms) < TEST_MAIN_AVOID_TIMEOUT_MS)
+    {
+        test_update_line_frame();
+    }
+
+    if (avoid_get_state() != 1)
+    {
+        printf("[TEST] avoid timeout, stop motor\r\n");
+        stop_motor_timer();
+    }
+    else
+    {
+        printf("[TEST] avoid done, line follow after avoid\r\n");
+        test_run_line_ms(TEST_MAIN_LINE_AFTER_MS);
+        stop_motor_timer();
+    }
+
+    printf("[TEST] done, paused\r\n");
+    while (true)
+    {
+        system_delay_ms(1000);
+    }
+
+    return 0;
+}
+#else
 int main()
 {
     // ====================== 1. 系统初始化 ======================
@@ -281,6 +378,7 @@ int main()
                 static bool vision_beep_latched = false;
                 if (vision_result != -1)
                 {
+                    avoid_set_vision_result(vision_result);
                     printf("vision_get() result: %d\n", vision_result);
                     if (!vision_beep_latched)
                     {
@@ -347,6 +445,8 @@ int main()
 
     return 0;
 }
+
+#endif
 
 // **************************** 清理函数 ****************************
 void sigint_handler(int signum)

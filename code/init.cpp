@@ -1,5 +1,7 @@
 #include "init.hpp"
+#include "avoid.hpp"
 #include "imu660.hpp"
+#include "motor.hpp"
 
 
 uint8 beep=0;
@@ -25,6 +27,14 @@ void start_motor_timer()
 {
     image_ready_flag = 1;  // 允许电机控制
     printf("[SYSTEM] 电机控制已启动!\r\n");
+}
+
+void stop_motor_timer()
+{
+    image_ready_flag = 0;
+    motor1_pwm_1.set_duty(0);
+    motor2_pwm_2.set_duty(0);
+    printf("[SYSTEM] motor control stopped\r\n");
 }
 
 void init_all()
@@ -53,6 +63,8 @@ void init_all()
     }
 
     motor_init();          // 电机 PWM 初始化
+    avoid_init();
+    avoid_set_enabled(true);
     
      motor_argument();      // 🌟 必须取消注释！给目标速度和 PID 参数赋值
     

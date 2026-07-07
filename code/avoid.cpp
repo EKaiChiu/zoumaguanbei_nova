@@ -12,16 +12,24 @@ enum AvoidState
     AVOID_DISABLED = 0,
     AVOID_IDLE,
     AVOID_TURN_LEFT_45,
+    AVOID_STRAIGHT_AFTER_LEFT,
+    AVOID_TURN_RIGHT_TO_MINUS_45,
 };
 
 static const float AVOID_CONTROL_DT_S = 0.02f;
-static const float AVOID_TARGET_ANGLE_DEG = 45.0f;
-static const int16 AVOID_LEFT_SPEED = -140;
-static const int16 AVOID_RIGHT_SPEED = 140;
+static const float AVOID_LEFT_TARGET_DEG = 45.0f;
+static const float AVOID_RIGHT_TARGET_DEG = -45.0f;
+static const int AVOID_STRAIGHT_TICKS = 25;
+static const int16 AVOID_TURN_LEFT_SPEED_L = -140;
+static const int16 AVOID_TURN_LEFT_SPEED_R = 140;
+static const int16 AVOID_TURN_RIGHT_SPEED_L = 140;
+static const int16 AVOID_TURN_RIGHT_SPEED_R = -140;
+static const int16 AVOID_STRAIGHT_SPEED = 120;
 
 static AvoidState avoid_state = AVOID_DISABLED;
 static int latest_vision_result = -1;
 static float avoid_angle_deg = 0.0f;
+static int avoid_straight_ticks = 0;
 static int printed_state = -1;
 
 static void avoid_print_state_once(void)
@@ -43,6 +51,7 @@ void avoid_init(void)
     avoid_state = AVOID_DISABLED;
     latest_vision_result = -1;
     avoid_angle_deg = 0.0f;
+    avoid_straight_ticks = 0;
     printed_state = -1;
 }
 
@@ -51,6 +60,7 @@ void avoid_set_enabled(bool enable)
     avoid_state = enable ? AVOID_IDLE : AVOID_DISABLED;
     latest_vision_result = -1;
     avoid_angle_deg = 0.0f;
+    avoid_straight_ticks = 0;
     printed_state = -1;
     printf("[AVOID] %s\r\n", enable ? "enabled" : "disabled");
 }
@@ -63,6 +73,18 @@ bool avoid_is_enabled(void)
 void avoid_set_vision_result(int result)
 {
     latest_vision_result = result;
+}
+
+void avoid_force_start(void)
+{
+    if (avoid_state == AVOID_DISABLED)
+        avoid_state = AVOID_IDLE;
+
+    avoid_state = AVOID_TURN_LEFT_45;
+    latest_vision_result = -1;
+    avoid_angle_deg = 0.0f;
+    avoid_straight_ticks = 0;
+    printed_state = -1;
 }
 
 bool avoid_control(void)
@@ -78,6 +100,7 @@ bool avoid_control(void)
         avoid_state = AVOID_TURN_LEFT_45;
         latest_vision_result = -1;
         avoid_angle_deg = 0.0f;
+        avoid_straight_ticks = 0;
         printed_state = -1;
     }
 
@@ -92,16 +115,51 @@ bool avoid_control(void)
     {
         avoid_angle_deg += get_gyro_z_dps(imu_dev) * AVOID_CONTROL_DT_S;
 
-        if (fabsf(avoid_angle_deg) < AVOID_TARGET_ANGLE_DEG)
+        if (fabsf(avoid_angle_deg) < AVOID_LEFT_TARGET_DEG)
         {
-            diff_speedl_expect = AVOID_LEFT_SPEED;
-            diff_speedr_expect = AVOID_RIGHT_SPEED;
+            diff_speedl_expect = AVOID_TURN_LEFT_SPEED_L;
+            diff_speedr_expect = AVOID_TURN_LEFT_SPEED_R;
+            return true;
+        }
+
+        avoid_state = AVOID_STRAIGHT_AFTER_LEFT;
+        avoid_straight_ticks = 0;
+        printed_state = -1;
+        diff_speedl_expect = AVOID_STRAIGHT_SPEED;
+        diff_speedr_expect = AVOID_STRAIGHT_SPEED;
+        return true;
+    }
+
+    if (avoid_state == AVOID_STRAIGHT_AFTER_LEFT)
+    {
+        avoid_angle_deg += get_gyro_z_dps(imu_dev) * AVOID_CONTROL_DT_S;
+        avoid_straight_ticks++;
+        diff_speedl_expect = AVOID_STRAIGHT_SPEED;
+        diff_speedr_expect = AVOID_STRAIGHT_SPEED;
+
+        if (avoid_straight_ticks >= AVOID_STRAIGHT_TICKS)
+        {
+            avoid_state = AVOID_TURN_RIGHT_TO_MINUS_45;
+            printed_state = -1;
+        }
+        return true;
+    }
+
+    if (avoid_state == AVOID_TURN_RIGHT_TO_MINUS_45)
+    {
+        avoid_angle_deg += get_gyro_z_dps(imu_dev) * AVOID_CONTROL_DT_S;
+
+        if (avoid_angle_deg > AVOID_RIGHT_TARGET_DEG)
+        {
+            diff_speedl_expect = AVOID_TURN_RIGHT_SPEED_L;
+            diff_speedr_expect = AVOID_TURN_RIGHT_SPEED_R;
             return true;
         }
 
         avoid_state = AVOID_IDLE;
         latest_vision_result = -1;
         avoid_angle_deg = 0.0f;
+        avoid_straight_ticks = 0;
         printed_state = -1;
         return false;
     }

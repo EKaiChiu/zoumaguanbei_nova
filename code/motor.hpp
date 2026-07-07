@@ -28,5 +28,6 @@ void motor_pid_left();
 void motor_pid_right();
 void motor_control();
 void motor_diff_pid1();
+void motor_set_line_base_speed(int speed);
 
 #endif

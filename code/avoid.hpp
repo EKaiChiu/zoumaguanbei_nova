@@ -10,6 +10,7 @@ bool avoid_is_enabled(void);
 
 /* 外部传入视觉识别结果。当前示例在绕行开启且 result 为 0/1/2 时触发。 */
 void avoid_set_vision_result(int result);
+void avoid_force_start(void);
 
 /* 绕行状态机主函数。true 表示接管电机，false 表示继续普通巡线。 */
 bool avoid_control(void);

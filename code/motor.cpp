@@ -60,6 +60,7 @@ int speed_pwm_min_l = 750;
 int speed_pwm_min_r = 725;
 float speed_pwm_feedforward_l = 10.6f;
 float speed_pwm_feedforward_r = 10.3f;
+static int line_base_speed = 200;
 
 static void reset_speed_pid_state()
 {
@@ -88,6 +89,15 @@ static float clamp_float(float value, float min_value, float max_value)
     if (value > max_value)
         return max_value;
     return value;
+}
+
+void motor_set_line_base_speed(int speed)
+{
+    if (speed < 45)
+        speed = 45;
+    if (speed > 260)
+        speed = 260;
+    line_base_speed = speed;
 }
 
 static void setup_speed_test_target()
@@ -656,7 +666,7 @@ void motor_diff_pid1()
     float current_kd = 0.20f;
     if (abs_turn_error <= 3.5f)
     {
-        current_kp = diff_kp * 3.6f;
+        current_kp = diff_kp * 2.6f;
         current_kd = 0.28f;
     }
     else if (abs_turn_error >= 4.5f)
@@ -702,7 +712,7 @@ void motor_diff_pid1()
         filtered_turn_output *= 0.35f;
     }
 
-    int current_base_speed = 200;
+    int current_base_speed = line_base_speed;
     if (abs_turn_error > 3.0f)
         current_base_speed -= (int)((abs_turn_error - 3.0f) * 9.0f);
     if (abs_turn_error >= 12.0f && current_base_speed > 60)
