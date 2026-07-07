@@ -11,21 +11,21 @@ enum AvoidState
 {
     AVOID_DISABLED = 0,
     AVOID_IDLE,
-    // 左绕行状态
-    AVOID_TURN_LEFT_45,
+    // Left avoid states.
+    AVOID_TURN_LEFT_OUT,
     AVOID_TURN_RIGHT_TO_ZERO,
     AVOID_STRAIGHT_AFTER_ZERO,
-    AVOID_TURN_RIGHT_TO_MINUS_45,
-    // 右绕行状态
-    AVOID_TURN_RIGHT_45,
+    AVOID_TURN_RIGHT_FINAL,
+    // Right avoid states.
+    AVOID_TURN_RIGHT_OUT,
     AVOID_TURN_LEFT_TO_ZERO,
-    AVOID_TURN_LEFT_TO_45,
+    AVOID_TURN_LEFT_FINAL,
 };
 
 static const float AVOID_CONTROL_DT_S = 0.02f;
-//左转参数
-static const float AVOID_LEFT_TARGET_DEG = 30.0f;//拐出角度
-static const float AVOID_ZERO_TARGET_DEG = 0.0f;//恢复角度
+// Avoid turn targets.
+static const float AVOID_LEFT_TARGET_DEG = 30.0f;
+static const float AVOID_ZERO_TARGET_DEG = 0.0f;
 static const float AVOID_RIGHT_TARGET_DEG = -30.0f;
 static const int AVOID_STRAIGHT_TICKS = 25;
 static const int16 AVOID_TURN_LEFT_SPEED_L = -160;
@@ -93,7 +93,7 @@ void avoid_force_start(void)
     if (avoid_state == AVOID_DISABLED)
         avoid_state = AVOID_IDLE;
 
-    avoid_state = AVOID_TURN_LEFT_45;
+    avoid_state = AVOID_TURN_LEFT_OUT;
     latest_vision_result = -1;
     avoid_angle_deg = 0.0f;
     avoid_straight_ticks = 0;
@@ -110,7 +110,7 @@ bool avoid_control_left(void)
 
     if (avoid_state == AVOID_IDLE && avoid_is_left_result(latest_vision_result))
     {
-        avoid_state = AVOID_TURN_LEFT_45;
+        avoid_state = AVOID_TURN_LEFT_OUT;
         latest_vision_result = -1;
         avoid_angle_deg = 0.0f;
         avoid_straight_ticks = 0;
@@ -124,7 +124,8 @@ bool avoid_control_left(void)
 
     avoid_print_state_once();
 
-    if (avoid_state == AVOID_TURN_LEFT_45)
+    // Turn out to the left side.
+    if (avoid_state == AVOID_TURN_LEFT_OUT)
     {
         avoid_angle_deg += get_gyro_z_dps(imu_dev) * AVOID_CONTROL_DT_S;
 
@@ -142,6 +143,7 @@ bool avoid_control_left(void)
         return true;
     }
 
+    // Turn back to center.
     if (avoid_state == AVOID_TURN_RIGHT_TO_ZERO)
     {
         avoid_angle_deg += get_gyro_z_dps(imu_dev) * AVOID_CONTROL_DT_S;
@@ -159,7 +161,7 @@ bool avoid_control_left(void)
         diff_speedr_expect = AVOID_STRAIGHT_SPEED;
         return true;
     }
-
+    // Go straight after returning to center.
     if (avoid_state == AVOID_STRAIGHT_AFTER_ZERO)
     {
         avoid_angle_deg += get_gyro_z_dps(imu_dev) * AVOID_CONTROL_DT_S;
@@ -169,29 +171,10 @@ bool avoid_control_left(void)
 
         if (avoid_straight_ticks >= AVOID_STRAIGHT_TICKS)
         {
-            avoid_state = AVOID_TURN_RIGHT_TO_MINUS_45;
+            avoid_state = AVOID_TURN_LEFT_FINAL;
             printed_state = -1;
         }
         return true;
-    }
-
-    if (avoid_state == AVOID_TURN_RIGHT_TO_MINUS_45)
-    {
-        avoid_angle_deg += get_gyro_z_dps(imu_dev) * AVOID_CONTROL_DT_S;
-
-        if (avoid_angle_deg > AVOID_RIGHT_TARGET_DEG)
-        {
-            diff_speedl_expect = AVOID_TURN_RIGHT_SPEED_L;
-            diff_speedr_expect = AVOID_TURN_RIGHT_SPEED_R;
-            return true;
-        }
-
-        avoid_state = AVOID_IDLE;
-        latest_vision_result = -1;
-        avoid_angle_deg = 0.0f;
-        avoid_straight_ticks = 0;
-        printed_state = -1;
-        return false;
     }
 
     return false;
@@ -207,7 +190,7 @@ bool avoid_control_right(void)
 
     if (avoid_state == AVOID_IDLE && avoid_is_right_result(latest_vision_result))
     {
-        avoid_state = AVOID_TURN_RIGHT_45;
+        avoid_state = AVOID_TURN_RIGHT_OUT;
         latest_vision_result = -1;
         avoid_angle_deg = 0.0f;
         avoid_straight_ticks = 0;
@@ -221,8 +204,8 @@ bool avoid_control_right(void)
 
     avoid_print_state_once();
 
-    // 阶段①：右转 30°（车头朝右）
-    if (avoid_state == AVOID_TURN_RIGHT_45)
+    // Turn out to the right side.
+    if (avoid_state == AVOID_TURN_RIGHT_OUT)
     {
         avoid_angle_deg += get_gyro_z_dps(imu_dev) * AVOID_CONTROL_DT_S;
 
@@ -240,7 +223,7 @@ bool avoid_control_right(void)
         return true;
     }
 
-    // 阶段②：左转回 0°（车头回正）
+    // Turn back to center.
     if (avoid_state == AVOID_TURN_LEFT_TO_ZERO)
     {
         avoid_angle_deg += get_gyro_z_dps(imu_dev) * AVOID_CONTROL_DT_S;
@@ -259,7 +242,7 @@ bool avoid_control_right(void)
         return true;
     }
 
-    // 阶段③：直行（与左绕行共用）
+    // Go straight after returning to center.
     if (avoid_state == AVOID_STRAIGHT_AFTER_ZERO)
     {
         avoid_angle_deg += get_gyro_z_dps(imu_dev) * AVOID_CONTROL_DT_S;
@@ -269,30 +252,10 @@ bool avoid_control_right(void)
 
         if (avoid_straight_ticks >= AVOID_STRAIGHT_TICKS)
         {
-            avoid_state = AVOID_TURN_LEFT_TO_45;
+            avoid_state = AVOID_TURN_LEFT_FINAL;
             printed_state = -1;
         }
         return true;
-    }
-
-    // 阶段④：左转到 +30°（最终航向）
-    if (avoid_state == AVOID_TURN_LEFT_TO_45)
-    {
-        avoid_angle_deg += get_gyro_z_dps(imu_dev) * AVOID_CONTROL_DT_S;
-
-        if (avoid_angle_deg < AVOID_LEFT_TARGET_DEG)
-        {
-            diff_speedl_expect = AVOID_TURN_LEFT_SPEED_L;
-            diff_speedr_expect = AVOID_TURN_LEFT_SPEED_R;
-            return true;
-        }
-
-        avoid_state = AVOID_IDLE;
-        latest_vision_result = -1;
-        avoid_angle_deg = 0.0f;
-        avoid_straight_ticks = 0;
-        printed_state = -1;
-        return false;
     }
 
     return false;
