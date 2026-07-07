@@ -35,6 +35,10 @@ int Repair_Point_Xsite, Repair_Point_Ysite;                                     
 uint8_t *binar;                                                                     // 灰度图像数组指针
 ROIRegionTypedef LargestWhiteRegion;
 
+static void Element_Judgment_Cross(void);
+static void RepairCrossLineFromCenter(int row);
+static void HandleCrossRoad(void);
+
 static void PrintRingStateIfChanged()
 {
     static int last_ring_state = -1;
@@ -1172,6 +1176,7 @@ void Element_Judgment_Left_Rings()
 //  @Author         MRCHEN
 //  示例用法:       Element_Judgment_Right_Rings();
 //--------------------------------------------------------------
+
 void Element_Judgment_Right_Rings()
 {
     if (ImageStatus.Left_Line > 4 || ImageStatus.Right_Line < 16 // 13
@@ -1808,6 +1813,79 @@ void Element_Handle_Right_Rings()
 }
 
 // 元素测试函数
+static int CountCrossLostRows(int *first_lost_row, int *last_lost_row)
+{
+    int lost_rows = 0;
+    *first_lost_row = -1;
+    *last_lost_row = -1;
+
+    for (int row = 50; row >= 12; row--)
+    {
+        if (ImageDeal[row].IsLeftFind == 'W' && ImageDeal[row].IsRightFind == 'W')
+        {
+            if (*first_lost_row < 0)
+                *first_lost_row = row;
+            *last_lost_row = row;
+            lost_rows++;
+        }
+    }
+
+    return lost_rows;
+}
+
+static int CountCrossBottomValidRows(void)
+{
+    int valid_rows = 0;
+
+    for (int row = 59; row >= 53; row--)
+    {
+        if (ImageDeal[row].IsLeftFind == 'T' &&
+            ImageDeal[row].IsRightFind == 'T' &&
+            ImageDeal[row].Wide > 14)
+        {
+            valid_rows++;
+        }
+    }
+
+    return valid_rows;
+}
+
+static void Element_Judgment_Cross(void)
+{
+    if (ImageFlag.image_element_rings != 0 ||
+        ImageStatus.Road_type == LeftCirque ||
+        ImageStatus.Road_type == RightCirque ||
+        ImageStatus.Road_type == Ramp ||
+        ImageStatus.Road_type == Barn_in ||
+        ImageStatus.Road_type == Barn_out)
+    {
+        return;
+    }
+
+    int first_lost_row = 0;
+    int last_lost_row = 0;
+    const int lost_rows = CountCrossLostRows(&first_lost_row, &last_lost_row);
+    const int bottom_valid_rows = CountCrossBottomValidRows();
+    const int lost_span = (first_lost_row >= last_lost_row) ? (first_lost_row - last_lost_row + 1) : 0;
+
+    if (ImageStatus.Road_type == Cross_ture)
+    {
+        if (lost_rows < 4 || bottom_valid_rows < 3)
+            ImageStatus.Road_type = Normol;
+        return;
+    }
+
+    if (bottom_valid_rows >= 4 &&
+        lost_rows >= 8 &&
+        lost_span >= 10 &&
+        ImageStatus.Left_Line >= 6 &&
+        ImageStatus.Right_Line >= 6 &&
+        ImageStatus.OFFLine <= 18)
+    {
+        ImageStatus.Road_type = Cross_ture;
+    }
+}
+
 void Element_Test(void)
 {
 
@@ -1818,6 +1896,8 @@ void Element_Test(void)
         Element_Judgment_Left_Rings();  // 左环岛判断
         Element_Judgment_Right_Rings(); // 右环岛判断
     }
+
+    Element_Judgment_Cross();
 }
 
 // 元素处理函数
@@ -1827,6 +1907,8 @@ void Element_Handle()
         Element_Handle_Left_Rings();
     else if (ImageFlag.image_element_rings == 2)
         Element_Handle_Right_Rings();
+    else
+        HandleCrossRoad();
 
     PrintRingStateIfChanged();
 }
@@ -1863,9 +1945,47 @@ static void RepairCrossLineFromCenter(int row)
     ImageDeal[row].IsRightFind = 'T';
 }
 
+static void HandleCrossRoad(void)
+{
+    if (ImageStatus.Road_type != Cross_ture)
+        return;
+
+    int anchor_row = 59;
+    for (int row = 59; row >= 45; row--)
+    {
+        if (ImageDeal[row].IsLeftFind == 'T' && ImageDeal[row].IsRightFind == 'T')
+        {
+            anchor_row = row;
+            break;
+        }
+    }
+
+    int anchor_center = ImageDeal[anchor_row].Center;
+    LimitL(anchor_center);
+    LimitH(anchor_center);
+
+    for (int row = anchor_row - 1; row >= ImageStatus.OFFLine && row >= 5; row--)
+    {
+        if (ImageDeal[row].IsLeftFind == 'W' && ImageDeal[row].IsRightFind == 'W')
+        {
+            ImageDeal[row].Center = anchor_center;
+            RepairCrossLineFromCenter(row);
+        }
+        else
+        {
+            anchor_center = (anchor_center + ImageDeal[row].Center) / 2;
+            LimitL(anchor_center);
+            LimitH(anchor_center);
+        }
+    }
+}
+
 // 丢双线的时候 处理无边行的补线
 static void RouteFilter(void)
 {
+    if (ImageStatus.Road_type != Cross_ture)
+        return;
+
     for (Ysite = 58; Ysite >= (ImageStatus.OFFLine + 5); Ysite--) // 从开始位置到停止位置 原58
     {
         if (ImageDeal[Ysite].IsLeftFind == 'W' && ImageDeal[Ysite].IsRightFind == 'W' && Ysite <= 45 &&
@@ -1893,11 +2013,12 @@ static void RouteFilter(void)
                 }
             }
         }
-        ImageDeal[Ysite].Center =
-            (ImageDeal[Ysite - 1].Center + 2 * ImageDeal[Ysite].Center) / 3; // 做平滑应该比较缓和  周围三行取平均
+        ImageDeal[Ysite].Center = (ImageDeal[Ysite - 1].Center + 2 * ImageDeal[Ysite].Center) / 3;
+
         if (ImageDeal[Ysite].IsLeftFind == 'W' && ImageDeal[Ysite].IsRightFind == 'W')
             RepairCrossLineFromCenter(Ysite);
     }
+
 }
 
 // 绘制边界线 用于调试

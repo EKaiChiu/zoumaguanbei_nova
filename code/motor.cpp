@@ -702,7 +702,7 @@ void motor_diff_pid1()
         filtered_turn_output *= 0.35f;
     }
 
-    int current_base_speed = 165 - (int)(abs_turn_error * 5.0f);
+    int current_base_speed = 200 - (int)(abs_turn_error * 5.0f);
     if (abs_turn_error >= 12.0f && current_base_speed > 55)
         current_base_speed = 55;
     else if (abs_turn_error >= 8.0f && current_base_speed > 75)
