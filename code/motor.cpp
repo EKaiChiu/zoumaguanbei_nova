@@ -485,7 +485,7 @@ void motor_control()
     // 模式0：完整寻迹（正常使用）
     // ════════════════════════════════════════════════
 
-    if (avoid_control())
+    if (avoid_control_left())
     {
         speed_goal_l = (float)diff_speedl_expect;
         speed_goal_r = (float)diff_speedr_expect;

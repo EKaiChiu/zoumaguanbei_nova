@@ -59,7 +59,6 @@
 #define TEST_MAIN_LINE_SPEED 140
 #define TEST_MAIN_LINE_BEFORE_MS 2000
 #define TEST_MAIN_LINE_AFTER_MS 2000
-#define TEST_MAIN_AVOID_TIMEOUT_MS 12000
 
 // ======================清理退出函数======================
 void sigint_handler(int sig);
@@ -168,31 +167,12 @@ int main()
     }
 
     start_motor_timer();
-    printf("[TEST] line follow before avoid\r\n");
+    printf("[TEST] line follow\r\n");
     test_run_line_ms(TEST_MAIN_LINE_BEFORE_MS);
 
-    printf("[TEST] beep and force avoid\r\n");
-    beep_short();
-    avoid_force_start();
-
-    uint32_t avoid_start_ms = test_now_ms();
-    while (avoid_get_state() != 1 &&
-           (uint32_t)(test_now_ms() - avoid_start_ms) < TEST_MAIN_AVOID_TIMEOUT_MS)
-    {
-        test_update_line_frame();
-    }
-
-    if (avoid_get_state() != 1)
-    {
-        printf("[TEST] avoid timeout, stop motor\r\n");
-        stop_motor_timer();
-    }
-    else
-    {
-        printf("[TEST] avoid done, line follow after avoid\r\n");
-        test_run_line_ms(TEST_MAIN_LINE_AFTER_MS);
-        stop_motor_timer();
-    }
+    printf("[TEST] line follow after wait\r\n");
+    test_run_line_ms(TEST_MAIN_LINE_AFTER_MS);
+    stop_motor_timer();
 
     printf("[TEST] done, paused\r\n");
     while (true)

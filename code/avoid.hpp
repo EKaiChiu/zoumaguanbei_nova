@@ -12,8 +12,11 @@ bool avoid_is_enabled(void);
 void avoid_set_vision_result(int result);
 void avoid_force_start(void);
 
-/* 绕行状态机主函数。true 表示接管电机，false 表示继续普通巡线。 */
-bool avoid_control(void);
+/* 绕行状态机主函数（左绕行）。true 表示接管电机，false 表示继续普通巡线。 */
+bool avoid_control_left(void);
+
+/* 绕行状态机主函数（右绕行，与左绕行镜像）。true 表示接管电机，false 表示继续普通巡线。 */
+bool avoid_control_right(void);
 
 /* 调试用：读取当前绕行状态。 */
 int avoid_get_state(void);
