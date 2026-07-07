@@ -1831,6 +1831,38 @@ void Element_Handle()
     PrintRingStateIfChanged();
 }
 
+static void RepairCrossLineFromCenter(int row)
+{
+    if (row < 0 || row >= LCDH)
+        return;
+
+    int center = ImageDeal[row].Center;
+    LimitL(center);
+    LimitH(center);
+
+    int half_width = Half_Road_Wide[row];
+    int left = center - half_width;
+    int right = center + half_width;
+
+    LimitL(left);
+    LimitH(right);
+
+    if (right - left <= 7)
+    {
+        left = center - 4;
+        right = center + 4;
+        LimitL(left);
+        LimitH(right);
+    }
+
+    ImageDeal[row].LeftBorder = left;
+    ImageDeal[row].RightBorder = right;
+    ImageDeal[row].Center = (left + right) / 2;
+    ImageDeal[row].Wide = right - left;
+    ImageDeal[row].IsLeftFind = 'T';
+    ImageDeal[row].IsRightFind = 'T';
+}
+
 // 丢双线的时候 处理无边行的补线
 static void RouteFilter(void)
 {
@@ -1854,6 +1886,7 @@ static void RouteFilter(void)
                     while (Ysite >= ytemp)
                     {
                         ImageDeal[Ysite].Center = (int)(CenterTemp + DetR * (float)(Ysite - LineTemp)); // 按斜率补
+                        RepairCrossLineFromCenter(Ysite);
                         Ysite--;
                     }
                     break;
@@ -1862,6 +1895,8 @@ static void RouteFilter(void)
         }
         ImageDeal[Ysite].Center =
             (ImageDeal[Ysite - 1].Center + 2 * ImageDeal[Ysite].Center) / 3; // 做平滑应该比较缓和  周围三行取平均
+        if (ImageDeal[Ysite].IsLeftFind == 'W' && ImageDeal[Ysite].IsRightFind == 'W')
+            RepairCrossLineFromCenter(Ysite);
     }
 }
 
