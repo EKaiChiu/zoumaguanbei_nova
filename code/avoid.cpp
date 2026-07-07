@@ -16,7 +16,7 @@ enum AvoidState
     AVOID_TURN_RIGHT_TO_ZERO,
     AVOID_STRAIGHT_AFTER_ZERO,
     AVOID_TURN_RIGHT_TO_MINUS_45,
-    // 右绕行状态（镜像）
+    // 右绕行状态
     AVOID_TURN_RIGHT_45,
     AVOID_TURN_LEFT_TO_ZERO,
     AVOID_TURN_LEFT_TO_45,
@@ -49,9 +49,14 @@ static void avoid_print_state_once(void)
     }
 }
 
-static bool avoid_is_target_result(int result)
+static bool avoid_is_left_result(int result)
 {
-    return result == 0 || result == 1 || result == 2;
+    return result == 0;
+}
+
+static bool avoid_is_right_result(int result)
+{
+    return result == 1;
 }
 
 void avoid_init(void)
@@ -103,7 +108,7 @@ bool avoid_control_left(void)
         return false;
     }
 
-    if (avoid_state == AVOID_IDLE && avoid_is_target_result(latest_vision_result))
+    if (avoid_state == AVOID_IDLE && avoid_is_left_result(latest_vision_result))
     {
         avoid_state = AVOID_TURN_LEFT_45;
         latest_vision_result = -1;
@@ -200,7 +205,7 @@ bool avoid_control_right(void)
         return false;
     }
 
-    if (avoid_state == AVOID_IDLE && avoid_is_target_result(latest_vision_result))
+    if (avoid_state == AVOID_IDLE && avoid_is_right_result(latest_vision_result))
     {
         avoid_state = AVOID_TURN_RIGHT_45;
         latest_vision_result = -1;
