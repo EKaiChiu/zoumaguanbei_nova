@@ -60,7 +60,7 @@ int speed_pwm_min_l = 750;
 int speed_pwm_min_r = 725;
 float speed_pwm_feedforward_l = 10.6f;
 float speed_pwm_feedforward_r = 10.3f;
-static int line_base_speed = 200;
+static int line_base_speed = 180;
 
 static void reset_speed_pid_state()
 {
@@ -712,6 +712,11 @@ void motor_diff_pid1()
     }
 
     int current_base_speed = line_base_speed;
+    bool ring_detected = (ImageStatus.Road_type == LeftCirque ||
+                          ImageStatus.Road_type == RightCirque ||
+                          ImageFlag.image_element_rings_flag != 0);
+    if (ring_detected && current_base_speed > 150)
+        current_base_speed = 150;
     if (abs_turn_error > 3.0f)
         current_base_speed -= (int)((abs_turn_error - 3.0f) * 9.0f);
     if (abs_turn_error >= 12.0f && current_base_speed > 60)
