@@ -320,7 +320,7 @@ int main()
 
             // 步骤2.5: 叠加横线标记到screen_buf
             draw_offline_line_on_screen(screen_buf); // 🔴丢线位置红色横线
-            // draw_towpoint_lines_on_screen(screen_buf);   // 🟢前瞻点范围青色横线
+            draw_towpoint_lines_on_screen(screen_buf); // 🟢前瞻点范围青色横线
 
             // 步骤3: 刷新整个IPS200屏幕（居中显示160×120）
             ips200.show_rgb565_image(80, 60, screen_buf[0], 160, 120, 160, 120, 0);
