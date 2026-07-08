@@ -1316,7 +1316,7 @@ void Element_Handle_Left_Rings()
         // wireless_uart_send_byte(2);
         printf("进入状态2\r\n");
     }
-    if (ImageFlag.image_element_rings_flag == 2 && num < 10)
+    if (ImageFlag.image_element_rings_flag == 2 && num < 5)
     {
 
         ImageFlag.image_element_rings_flag = 5;
@@ -1620,7 +1620,7 @@ void Element_Handle_Right_Rings()
     {
         ImageFlag.image_element_rings_flag = 2;
     }
-    if (ImageFlag.image_element_rings_flag == 2 && num < 8)
+    if (ImageFlag.image_element_rings_flag == 2 && num < 5)
     {
         ImageFlag.image_element_rings_flag = 5;
     }
