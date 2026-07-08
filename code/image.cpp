@@ -1483,7 +1483,7 @@ void Element_Handle_Left_Rings()
             {
                 ImageDeal[Ysite].RightBorder = flag_Xsite_1 + Slope_Rings * (Ysite - flag_Ysite_1);
                 // if(ImageFlag.ring_big_small==1)// 大环岛补中线
-                ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder - Half_Bend_Wide[Ysite];
+                ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder / 2;
                 // else// 小环岛补中线
                 //     ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder - Half_Bend_Wide[Ysite];
                 if (ImageDeal[Ysite].Center < 4)
@@ -1499,7 +1499,7 @@ void Element_Handle_Left_Rings()
                     {
                         ImageDeal[Ysite].RightBorder = Xsite;
                         // if(ImageFlag.ring_big_small==1)// 大环岛补中线
-                        ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder - Half_Bend_Wide[Ysite];
+                        ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder / 2;
                         // else// 小环岛补中线
                         //     ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder - Half_Bend_Wide[Ysite];
                         if (ImageDeal[Ysite].Center < 4)
