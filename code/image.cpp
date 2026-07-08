@@ -1211,26 +1211,14 @@ void Element_Judgment_Left_Rings()
     if (Left_RingsFlag_Point1_Ysite > 0 && Left_RingsFlag_Point2_Ysite > Left_RingsFlag_Point1_Ysite + 3 &&
         Ring_Help_Flag == 1 && ImageFlag.image_element_rings_flag == 0)
     {
-        if (left_white_ok)
-        {
-            left_rings_stable_cnt++;
-        }
-        else
-        {
-            left_rings_stable_cnt = 0;
-        }
+        left_rings_stable_cnt = 0;
+        ImageFlag.image_element_rings = 1;
+        ImageFlag.image_element_rings_flag = 1;
+        ImageFlag.ring_big_small = 1;
 
-        if (left_rings_stable_cnt >= 3)
-        {
-            left_rings_stable_cnt = 0;
-            ImageFlag.image_element_rings = 1;
-            ImageFlag.image_element_rings_flag = 1;
-            ImageFlag.ring_big_small = 1;
-
-            ImageStatus.Road_type = LeftCirque;
-            printf("[RINGDBG][L] ENTER left ring p1=%d p2=%d\r\n", Left_RingsFlag_Point1_Ysite,
-                   Left_RingsFlag_Point2_Ysite);
-        }
+        ImageStatus.Road_type = LeftCirque;
+        printf("[RINGDBG][L] ENTER left ring p1=%d p2=%d\r\n", Left_RingsFlag_Point1_Ysite,
+               Left_RingsFlag_Point2_Ysite);
         // gpio_set_level(P20_8, 0);
         // wireless_uart_send_byte(9);
     }
@@ -1309,18 +1297,7 @@ void Element_Judgment_Right_Rings()
     if (Right_RingsFlag_Point1_Ysite > 0 && Right_RingsFlag_Point2_Ysite > Right_RingsFlag_Point1_Ysite + 3 &&
         Ring_Help_Flag == 1 && ImageFlag.image_element_rings_flag == 0)
     {
-        if (has_white_segment(LCDW - 4, 20, 55, 10))
-        {
-            right_rings_stable_cnt++;
-        }
-        else
-        {
-            right_rings_stable_cnt = 0;
-        }
-
-        if (right_rings_stable_cnt >= 3)
-        {
-            right_rings_stable_cnt = 0;
+        right_rings_stable_cnt = 0;
         ImageFlag.image_element_rings = 2;
         ImageFlag.image_element_rings_flag = 1;
         ImageFlag.ring_big_small = 1; // 小环
@@ -1328,7 +1305,6 @@ void Element_Judgment_Right_Rings()
         ImageStatus.Road_type = RightCirque;
         printf("[RINGDBG][R] ENTER right ring p1=%d p2=%d\r\n", Right_RingsFlag_Point1_Ysite,
                Right_RingsFlag_Point2_Ysite);
-        }
         //        flag_ceshi++;
         //        gpio_set_level(Bee1p, 1);
     }
