@@ -296,7 +296,7 @@ void draw_offline_line_on_screen(uint16 screen_buf[][160])
 // ⭐⭐ 高级功能 #8.6：在RGB565缓冲区绘制🟢前瞻点范围横线
 //
 // 参考工程：drawtowpointUP() + drawtowpointDOWN()
-// 功能：在TowPoint±5行的位置画两条青色横线，标记前瞻点搜索范围
+// 功能：在55行和58行的位置画两条青色横线，标记底部环岛判定参考行
 // 参数：screen_buf - 160×120的RGB565显存数组
 // 颜色：RGB565青色(0x07FF)
 // ════════════════════════════════════════════════════════════
@@ -304,10 +304,10 @@ void draw_towpoint_lines_on_screen(uint16 screen_buf[][160])
 {
     const uint16 CYAN_COLOR = 0x07FF; // RGB565青色: R=0,G=63,B=31
 
-    int towpoint_up_y = (ImageStatus.TowPoint - 5) * 2;   // 上界：TowPoint-5 → ×2
-    int towpoint_down_y = (ImageStatus.TowPoint + 5) * 2; // 下界：TowPoint+5 → ×2
+    int towpoint_up_y = 55 * 2;
+    int towpoint_down_y = 58 * 2;
 
-    // 🟢 上界横线（TowPoint-5）
+    // 🟢 55行横线
     if (towpoint_up_y >= 0 && towpoint_up_y < 120)
     {
         for (int x = 0; x < 160; x++)
@@ -316,7 +316,7 @@ void draw_towpoint_lines_on_screen(uint16 screen_buf[][160])
         }
     }
 
-    // 🟢 下界横线（TowPoint+5）
+    // 🟢 58行横线
     if (towpoint_down_y >= 0 && towpoint_down_y < 120)
     {
         for (int x = 0; x < 160; x++)
