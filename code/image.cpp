@@ -44,6 +44,7 @@ ROIRegionTypedef LargestWhiteRegion;
 static void Element_Judgment_Cross(void);
 static void RepairCrossLineFromCenter(int row);
 static void HandleCrossRoad(void);
+static void ApplyRingSLineToMainLine(void);
 
 static void PrintRingStateIfChanged()
 {
@@ -64,6 +65,36 @@ static void PrintRingStateIfChanged()
 
         printf("[RING] state=%d side=%s type=%d road=%d\r\n", state, side, ImageFlag.ring_big_small,
                ImageStatus.Road_type);
+    }
+}
+
+static void ApplyRingSLineToMainLine(void)
+{
+    if (ImageFlag.image_element_rings_flag == 0 && ImageStatus.Road_type != LeftCirque &&
+        ImageStatus.Road_type != RightCirque)
+        return;
+
+    for (int y = 0; y < LCDH; y++)
+    {
+        int left = ImageDeal[y].LeftBoundary;
+        int right = ImageDeal[y].RightBoundary;
+
+        if (left < 0)
+            left = 0;
+        if (left >= LCDW)
+            left = LCDW - 1;
+        if (right < 0)
+            right = 0;
+        if (right >= LCDW)
+            right = LCDW - 1;
+
+        if (right - left <= 7)
+            continue;
+
+        ImageDeal[y].LeftBorder = left;
+        ImageDeal[y].RightBorder = right;
+        ImageDeal[y].Wide = right - left;
+        ImageDeal[y].Center = (left + right) / 2;
     }
 }
 
@@ -2308,6 +2339,8 @@ void ImageProcess(void)
     /***元素识别*****/
     Element_Test(); // 5us
     /***元素识别*****/
+    ApplyRingSLineToMainLine();
+
     DrawExtensionLine();
     RouteFilter();    // 路径滤波平滑 2us
                       /***元素处理*****/
