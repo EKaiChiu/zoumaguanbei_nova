@@ -1477,33 +1477,7 @@ void Element_Handle_Left_Rings()
     if (ImageFlag.image_element_rings_flag == 7)
     {
     }
-    // 大环岛出环 补线
-    if (ImageFlag.image_element_rings_flag == 8 && ImageFlag.ring_big_small == 1) // 大环
-    {
-        //        Repair_Point_Xsite = 40;
-        Repair_Point_Ysite = 7;
-        //        for (int Ysite = 40; Ysite > 5; Ysite--)
-        //        {
-        //            if (Pixle[Ysite][28] == 1 && Pixle[Ysite-1][28] == 0)//28
-        //            {
-        //                Repair_Point_Xsite = 40;
-        //                Repair_Point_Ysite= Ysite-1;
-        //                ImageStatus.OFFLine = Ysite + 1;  // 防止继续向上规划
-        //                break;
-        //            }
-        //        }
-        for (int Ysite = 57; Ysite > Repair_Point_Ysite - 3; Ysite--) // 补线
-        {
-            //            ImageDeal[Ysite].RightBorder = (ImageDeal[58].RightBorder - Repair_Point_Xsite) * (Ysite - 58)
-            //            / (58 - Repair_Point_Ysite)  + ImageDeal[58].RightBorder;
-            ImageDeal[Ysite].RightBorder = ImageDeal[Ysite].LeftBorder + Half_Bend_Wide[Ysite];
-            if (ImageDeal[Ysite].RightBorder > 77)
-            {
-                ImageDeal[Ysite].RightBorder = 77;
-            }
-            ImageDeal[Ysite].Center = ((ImageDeal[Ysite].RightBorder + ImageDeal[Ysite].LeftBorder) / 2);
-        }
-    }
+    // 大环岛出环不再根据弯道宽度强制推边线，避免出环时中线被重新拉偏。
     //        // 小环岛出环 补线
     //    if (ImageFlag.image_element_rings_flag == 8 && ImageFlag.ring_big_small == 2)    // 小环
     //    {
@@ -1742,34 +1716,7 @@ void Element_Handle_Right_Rings()
     if (ImageFlag.image_element_rings_flag == 7)
     {
     }
-    // 大环岛出环 补线
-    if (ImageFlag.image_element_rings_flag == 8) // 大环
-    {
-        //        Repair_Point_Xsite = 42;
-        Repair_Point_Ysite = 7;
-        //        for (int Ysite = 40; Ysite > 8; Ysite--)
-        //        {
-        //            if (Pixle[Ysite][28] == 1 && Pixle[Ysite-1][28] == 0)
-        //            {
-        //                Repair_Point_Xsite = 42;
-        //                Repair_Point_Ysite = Ysite-1;
-        //                ImageStatus.OFFLine = Ysite + 1;  // 防止继续向上规划
-        //                break;
-        //            }
-        //        }
-        for (int Ysite = 57; Ysite > Repair_Point_Ysite - 3; Ysite--) // 补线
-        {
-            //            ImageDeal[Ysite].LeftBorder = (ImageDeal[58].LeftBorder - Repair_Point_Xsite) * (Ysite - 58) /
-            //            (58 - Repair_Point_Ysite)  + ImageDeal[58].LeftBorder;
-            // if(ImageDeal[Ysite].LeftBorder<3){ImageDeal[Ysite].LeftBorder = 3;}
-            ImageDeal[Ysite].LeftBorder = ImageDeal[Ysite].RightBorder - Half_Bend_Wide[Ysite];
-            if (ImageDeal[Ysite].LeftBorder < 3)
-            {
-                ImageDeal[Ysite].LeftBorder = 3;
-            }
-            ImageDeal[Ysite].Center = (ImageDeal[Ysite].RightBorder + ImageDeal[Ysite].LeftBorder) / 2;
-        }
-    }
+    // 大环岛出环不再根据弯道宽度强制推边线，避免出环时中线被重新拉偏。
     // 已出环 切内线
     if (ImageFlag.image_element_rings_flag == 9)
     {
