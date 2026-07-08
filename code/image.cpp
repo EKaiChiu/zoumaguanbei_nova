@@ -1430,8 +1430,7 @@ void Element_Handle_Left_Rings()
 
     /***************************************控制**************************************/
     // 准备进环 切内线
-    if (ImageFlag.image_element_rings_flag == 1 || ImageFlag.image_element_rings_flag == 2 ||
-        ImageFlag.image_element_rings_flag == 3 || ImageFlag.image_element_rings_flag == 4)
+    if (ImageFlag.image_element_rings_flag == 1)
     {
         for (int Ysite = 57; Ysite > ImageStatus.OFFLine; Ysite--)
         {
@@ -1523,6 +1522,13 @@ void Element_Handle_Left_Rings()
         }
     }
     // 小环岛出环 环内不处理
+    if (ImageFlag.image_element_rings_flag >= 2 && ImageFlag.image_element_rings_flag <= 5)
+    {
+        for (int Ysite = 59; Ysite > ImageStatus.OFFLine; Ysite--)
+        {
+            ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder - Half_Road_Wide[Ysite] - 5;
+        }
+    }
     if (ImageFlag.image_element_rings_flag == 7)
     {
     }
