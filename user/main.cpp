@@ -50,7 +50,7 @@
 // ====================== 网络配置宏定义 ======================
 #define PORT 8086
 #define IMAGE_TRANSFER_INTERVAL 3
-#define IMAGE_TRANSFER_DEFAULT_STATE IMAGE_TRANSFER_OFF
+#define IMAGE_TRANSFER_DEFAULT_STATE IMAGE_TRANSFER_INIT
 
 // #define DEBUG_PRINT
 
