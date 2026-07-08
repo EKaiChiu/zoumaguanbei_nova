@@ -91,52 +91,6 @@ static float clamp_float(float value, float min_value, float max_value)
     return value;
 }
 
-static int get_valid_centerline_length()
-{
-    int valid_length = 0;
-
-    for (int row = LCDH - 1; row >= 0; --row)
-    {
-        if (row < ImageStatus.OFFLine)
-            break;
-
-        bool has_left = (ImageDeal[row].IsLeftFind == 'T');
-        bool has_right = (ImageDeal[row].IsRightFind == 'T');
-        bool has_width = (ImageDeal[row].Wide > 7);
-        bool has_center = (ImageDeal[row].Center > 0 && ImageDeal[row].Center < (LCDW - 1));
-
-        if (has_left && has_right && has_width && has_center)
-            ++valid_length;
-    }
-
-    return valid_length;
-}
-
-static float speed_decision(int num, float max_speed, float min_speed)
-{
-    static float last_speed = 0.0f;
-
-    const float L_MIN = 18.0f;
-    const float L_MAX = 52.0f;
-    const float alpha = 0.2f;
-
-    float x = ((float)num - L_MIN) / (L_MAX - L_MIN);
-    x = clamp_float(x, 0.0f, 1.0f);
-
-    float x_offset = x - 0.5f;
-    float target_ratio = 4.0f * x_offset * x_offset * x_offset + 0.5f;
-    target_ratio = clamp_float(target_ratio, 0.0f, 1.0f);
-
-    float target_speed = min_speed + target_ratio * (max_speed - min_speed);
-    if (last_speed <= 1.0f)
-        last_speed = target_speed;
-
-    float output_speed = alpha * target_speed + (1.0f - alpha) * last_speed;
-    last_speed = output_speed;
-
-    return output_speed;
-}
-
 void motor_set_line_base_speed(int speed)
 {
     if (speed < 45)
@@ -757,8 +711,7 @@ void motor_diff_pid1()
         filtered_turn_output *= 0.35f;
     }
 
-    int valid_centerline_length = get_valid_centerline_length();
-    int current_base_speed = (int)speed_decision(valid_centerline_length, (float)line_base_speed, 60.0f);
+    int current_base_speed = line_base_speed;
     if (abs_turn_error > 3.0f)
         current_base_speed -= (int)((abs_turn_error - 3.0f) * 9.0f);
     if (abs_turn_error >= 12.0f && current_base_speed > 60)
