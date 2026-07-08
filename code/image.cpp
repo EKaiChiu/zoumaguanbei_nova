@@ -1434,7 +1434,7 @@ void Element_Handle_Left_Rings()
     {
         for (int Ysite = 57; Ysite > ImageStatus.OFFLine; Ysite--)
         {
-            ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder - Half_Road_Wide[Ysite] - 5;
+            ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder - Half_Road_Wide[Ysite] + 5;
         }
     }
     // 进环 切外
@@ -1526,7 +1526,7 @@ void Element_Handle_Left_Rings()
     {
         for (int Ysite = 59; Ysite > ImageStatus.OFFLine; Ysite--)
         {
-            ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder - Half_Road_Wide[Ysite] - 5;
+            ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder - Half_Road_Wide[Ysite] + 5;
         }
     }
     if (ImageFlag.image_element_rings_flag == 7)
