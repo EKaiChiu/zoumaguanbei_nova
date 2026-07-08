@@ -1,8 +1,6 @@
 #include "motor.hpp"
 #include "avoid.hpp"
 #include "config.hpp"
-#include "imu660.hpp"
-#include "init.hpp"
 zf_driver_gpio motor1_gpio(motor1_dir, O_RDWR);
 zf_driver_gpio motor2_gpio(motor2_dir, O_RDWR);
 
@@ -63,11 +61,6 @@ int speed_pwm_min_r = 725;
 float speed_pwm_feedforward_l = 10.6f;
 float speed_pwm_feedforward_r = 10.3f;
 static int line_base_speed = 180;
-static const float MOTOR_CONTROL_DT_S = 0.02f;
-static const float LEFT_RING_GYRO_TARGET_DEG = 18.0f;
-static const float LEFT_RING_GYRO_BIAS = 8.0f;
-static float left_ring_gyro_angle_deg = 0.0f;
-static bool left_ring_gyro_active = false;
 
 static void reset_speed_pid_state()
 {
@@ -665,37 +658,6 @@ void motor_diff_pid1()
     if (turn_error > -1.5f && turn_error < 1.5f)
     {
         turn_error = 0;
-    }
-
-    bool ring_entering = (ImageFlag.image_element_rings_flag >= 1 &&
-                          ImageFlag.image_element_rings_flag <= 6);
-    if (ring_entering)
-    {
-        if (ImageFlag.image_element_rings == 1 || ImageStatus.Road_type == LeftCirque)
-            turn_error -= 4.0f;
-        else if (ImageFlag.image_element_rings == 2 || ImageStatus.Road_type == RightCirque)
-            turn_error += 4.0f;
-    }
-
-    bool left_ring_gyro_hold = (ImageFlag.image_element_rings == 1 &&
-                                ImageFlag.image_element_rings_flag >= 2 &&
-                                ImageFlag.image_element_rings_flag <= 5);
-    if (left_ring_gyro_hold)
-    {
-        if (!left_ring_gyro_active)
-        {
-            left_ring_gyro_active = true;
-            left_ring_gyro_angle_deg = 0.0f;
-        }
-
-        left_ring_gyro_angle_deg += abs_float(get_gyro_z_dps(imu_dev)) * MOTOR_CONTROL_DT_S;
-        if (left_ring_gyro_angle_deg < LEFT_RING_GYRO_TARGET_DEG)
-            turn_error -= LEFT_RING_GYRO_BIAS;
-    }
-    else
-    {
-        left_ring_gyro_active = false;
-        left_ring_gyro_angle_deg = 0.0f;
     }
 
     float abs_turn_error = abs_float(turn_error);
