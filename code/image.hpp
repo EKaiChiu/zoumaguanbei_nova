@@ -62,11 +62,13 @@ typedef struct {
 typedef enum {
   Normol,       //无任何特征
   Straight,     ////直道
-  Cross,        
+  Cross,
   Ramp,         //坡道
   LeftCirque,   ////左圆环
   RightCirque,  ////右圆环
   Cross_ture,   ////十字
+  Barn_in,
+  Barn_out,
 } RoadType_e;
 
 typedef struct {
