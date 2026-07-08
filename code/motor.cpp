@@ -660,6 +660,16 @@ void motor_diff_pid1()
         turn_error = 0;
     }
 
+    bool ring_entering = (ImageFlag.image_element_rings_flag >= 1 &&
+                          ImageFlag.image_element_rings_flag <= 6);
+    if (ring_entering)
+    {
+        if (ImageFlag.image_element_rings == 1 || ImageStatus.Road_type == LeftCirque)
+            turn_error -= 4.0f;
+        else if (ImageFlag.image_element_rings == 2 || ImageStatus.Road_type == RightCirque)
+            turn_error += 4.0f;
+    }
+
     float abs_turn_error = abs_float(turn_error);
     float current_kp = diff_kp;
     float current_kd = 0.20f;
