@@ -1357,7 +1357,7 @@ void Element_Handle_Left_Rings()
     // 进环
     if (ImageFlag.image_element_rings_flag == 5)
     {
-        printf("[左环岛状态6条件] 当前状态=5 右边线=%d 阈值=25 是否满足=%s\n",
+        printf("[左环岛状态6条件] 当前状态=5 右侧丢线=%d 阈值>25 是否满足=%s\n",
                ImageStatus.Right_Line,
                (ImageStatus.Right_Line > 25) ? "是" : "否");
     }
@@ -1373,7 +1373,7 @@ void Element_Handle_Left_Rings()
     // 状态6：打印调试信息
     if (ImageFlag.image_element_rings_flag == 6)
     {
-        printf("[RING][STATE6] Right_Line = %d\n", ImageStatus.Right_Line);
+        printf("[左环岛状态6] 右侧丢线=%d\n", ImageStatus.Right_Line);
     }
 
     // 状态6 → 状态7 转换条件
