@@ -1324,7 +1324,7 @@ void Element_Handle_Left_Rings()
         // wireless_uart_send_byte(5);
     }
     // 进环
-    if (ImageFlag.image_element_rings_flag == 5 && /*num>15)*/ ImageStatus.Right_Line > 15)
+    if (ImageFlag.image_element_rings_flag == 5 && /*num>15)*/ ImageStatus.Right_Line > 25)
     {
         ImageFlag.image_element_rings_flag = 6;
         printf("进入状态6\r\n");
@@ -1619,7 +1619,7 @@ void Element_Handle_Right_Rings()
         ImageFlag.image_element_rings_flag = 5;
     }
     // 进环
-    if (ImageFlag.image_element_rings_flag == 5 && ImageStatus.Left_Line > 15)
+    if (ImageFlag.image_element_rings_flag == 5 && ImageStatus.Left_Line > 25)
     {
         ImageFlag.image_element_rings_flag = 6;
         // ImageStatus.Road_type = RightCirque;
