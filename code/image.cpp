@@ -1477,31 +1477,27 @@ void Element_Handle_Left_Rings()
     if (ImageFlag.image_element_rings_flag == 7)
     {
     }
-    // 大环岛出环 补线
+    // 大环岛出环补线：右侧角点连到OFFLine最左侧，不再根据弯道宽度推线
     if (ImageFlag.image_element_rings_flag == 8 && ImageFlag.ring_big_small == 1) // 大环
     {
-        //        Repair_Point_Xsite = 40;
-        Repair_Point_Ysite = 7;
-        //        for (int Ysite = 40; Ysite > 5; Ysite--)
-        //        {
-        //            if (Pixle[Ysite][28] == 1 && Pixle[Ysite-1][28] == 0)//28
-        //            {
-        //                Repair_Point_Xsite = 40;
-        //                Repair_Point_Ysite= Ysite-1;
-        //                ImageStatus.OFFLine = Ysite + 1;  // 防止继续向上规划
-        //                break;
-        //            }
-        //        }
-        for (int Ysite = 57; Ysite > Repair_Point_Ysite - 3; Ysite--) // 补线
+        int repair_y = ImageStatus.OFFLine;
+        if (repair_y < 0)
+            repair_y = 0;
+        if (repair_y >= Point_Ysite)
+            repair_y = Point_Ysite - 1;
+
+        if (Point_Ysite > repair_y)
         {
-            //            ImageDeal[Ysite].RightBorder = (ImageDeal[58].RightBorder - Repair_Point_Xsite) * (Ysite - 58)
-            //            / (58 - Repair_Point_Ysite)  + ImageDeal[58].RightBorder;
-            ImageDeal[Ysite].RightBorder = ImageDeal[Ysite].LeftBorder + Half_Bend_Wide[Ysite];
-            if (ImageDeal[Ysite].RightBorder > 77)
+            float slope = (float)Point_Xsite / (float)(Point_Ysite - repair_y);
+            for (int Ysite = Point_Ysite; Ysite > repair_y; Ysite--)
             {
-                ImageDeal[Ysite].RightBorder = 77;
+                ImageDeal[Ysite].RightBorder = (int)(slope * (Ysite - repair_y));
+                if (ImageDeal[Ysite].RightBorder > 77)
+                    ImageDeal[Ysite].RightBorder = 77;
+                if (ImageDeal[Ysite].RightBorder < 0)
+                    ImageDeal[Ysite].RightBorder = 0;
+                ImageDeal[Ysite].Center = (ImageDeal[Ysite].RightBorder + ImageDeal[Ysite].LeftBorder) / 2;
             }
-            ImageDeal[Ysite].Center = ((ImageDeal[Ysite].RightBorder + ImageDeal[Ysite].LeftBorder) / 2);
         }
     }
     //        // 小环岛出环 补线
