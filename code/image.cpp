@@ -1132,6 +1132,15 @@ void Element_Judgment_Left_Rings()
     bool left_pre_row57_ok = (ImageDeal[57].IsLeftFind != 'W');
     bool left_pre_row58_ok = (ImageDeal[58].IsLeftFind != 'W');
 
+    printf("[RINGDBG][L][PRE] RL=%d ok=%d LL=%d ok=%d OFF=%d ok=%d WL=%d ok=%d L57=%c ok=%d L58=%c ok=%d flag=%d\r\n",
+           ImageStatus.Right_Line, left_pre_right_line_ok,
+           ImageStatus.Left_Line, left_pre_left_line_ok,
+           ImageStatus.OFFLine, left_pre_offline_ok,
+           ImageStatus.WhiteLine, left_pre_whiteline_ok,
+           ImageDeal[57].IsLeftFind, left_pre_row57_ok,
+           ImageDeal[58].IsLeftFind, left_pre_row58_ok,
+           ImageFlag.image_element_rings_flag);
+
     if (!left_pre_right_line_ok || !left_pre_left_line_ok
         || !left_pre_offline_ok
         //  ||variance_acc>20
@@ -1189,10 +1198,20 @@ void Element_Judgment_Left_Rings()
             Ring_Help_Flag = 1;
         }
     }
+    bool left_white_ok = has_white_segment(3, 20, 55, 10);
+    printf("[RINGDBG][L][POINT] p1=%d p2=%d p1_ok=%d p2_ok=%d help=%d flag0=%d white=%d stable=%d\r\n",
+           Left_RingsFlag_Point1_Ysite,
+           Left_RingsFlag_Point2_Ysite,
+           Left_RingsFlag_Point1_Ysite > 0,
+           Left_RingsFlag_Point2_Ysite > Left_RingsFlag_Point1_Ysite + 3,
+           Ring_Help_Flag,
+           ImageFlag.image_element_rings_flag == 0,
+           left_white_ok,
+           left_rings_stable_cnt);
     if (Left_RingsFlag_Point1_Ysite > 0 && Left_RingsFlag_Point2_Ysite > Left_RingsFlag_Point1_Ysite + 3 &&
         Ring_Help_Flag == 1 && ImageFlag.image_element_rings_flag == 0)
     {
-        if (has_white_segment(3, 20, 55, 10))
+        if (left_white_ok)
         {
             left_rings_stable_cnt++;
         }
