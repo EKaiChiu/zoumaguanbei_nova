@@ -1326,11 +1326,11 @@ void Element_Handle_Left_Rings()
     // 进环
     if (ImageFlag.image_element_rings_flag == 5)
     {
-        printf("[左环岛状态6条件] 当前状态=5 右边线=%d 阈值=25 是否满足=%s\n",
+        printf("[左环岛状态6条件] 当前状态=5 右侧丢线=%d 阈值<5 是否满足=%s\n",
                ImageStatus.Right_Line,
-               (ImageStatus.Right_Line > 25) ? "是" : "否");
+               (ImageStatus.Right_Line < 5) ? "是" : "否");
     }
-    if (ImageFlag.image_element_rings_flag == 5 && /*num>15)*/ ImageStatus.Right_Line > 25)
+    if (ImageFlag.image_element_rings_flag == 5 && /*num>15)*/ ImageStatus.Right_Line < 5)
     {
         ImageFlag.image_element_rings_flag = 6;
         printf("进入状态6\r\n");
@@ -1627,11 +1627,11 @@ void Element_Handle_Right_Rings()
     // 进环
     if (ImageFlag.image_element_rings_flag == 5)
     {
-        printf("[右环岛状态6条件] 当前状态=5 左边线=%d 阈值=25 是否满足=%s\n",
+        printf("[右环岛状态6条件] 当前状态=5 左侧丢线=%d 阈值<5 是否满足=%s\n",
                ImageStatus.Left_Line,
-               (ImageStatus.Left_Line > 25) ? "是" : "否");
+               (ImageStatus.Left_Line < 5) ? "是" : "否");
     }
-    if (ImageFlag.image_element_rings_flag == 5 && ImageStatus.Left_Line > 25)
+    if (ImageFlag.image_element_rings_flag == 5 && ImageStatus.Left_Line < 5)
     {
         ImageFlag.image_element_rings_flag = 6;
         // ImageStatus.Road_type = RightCirque;
