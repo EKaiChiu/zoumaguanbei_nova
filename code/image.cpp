@@ -57,6 +57,36 @@ float my_abs(float x)
     return x;
 }
 
+static void ApplyRingSLineToMainLine(void)
+{
+    if (ImageFlag.image_element_rings_flag == 0 && ImageStatus.Road_type != LeftCirque &&
+        ImageStatus.Road_type != RightCirque)
+        return;
+
+    for (int y = 0; y < LCDH; y++)
+    {
+        int left = ImageDeal[y].LeftBoundary;
+        int right = ImageDeal[y].RightBoundary;
+
+        if (left < 0)
+            left = 0;
+        if (left >= LCDW)
+            left = LCDW - 1;
+        if (right < 0)
+            right = 0;
+        if (right >= LCDW)
+            right = LCDW - 1;
+
+        if (right - left <= 7)
+            continue;
+
+        ImageDeal[y].LeftBorder = left;
+        ImageDeal[y].RightBorder = right;
+        ImageDeal[y].Wide = right - left;
+        ImageDeal[y].Center = (left + right) / 2;
+    }
+}
+
 // 图像压缩：将OpenCV的Mat图像复制到自定义数组中（2倍下采样 160×120 → 80×60）
 void compressimage()
 {
@@ -2126,6 +2156,8 @@ void ImageProcess(void)
     /***元素识别*****/
     Element_Test(); // 5us
     /***元素识别*****/
+    ApplyRingSLineToMainLine();
+
     DrawExtensionLine();
     RouteFilter();    // 路径滤波平滑 2us
                       /***元素处理*****/
