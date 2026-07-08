@@ -1483,7 +1483,7 @@ void Element_Handle_Left_Rings()
             {
                 ImageDeal[Ysite].RightBorder = flag_Xsite_1 + Slope_Rings * (Ysite - flag_Ysite_1);
                 // if(ImageFlag.ring_big_small==1)// 大环岛补中线
-                ImageDeal[Ysite].Center = ((ImageDeal[Ysite].RightBorder + ImageDeal[Ysite].LeftBorder) / 2);
+                ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder - Half_Bend_Wide[Ysite];
                 // else// 小环岛补中线
                 //     ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder - Half_Bend_Wide[Ysite];
                 if (ImageDeal[Ysite].Center < 4)
@@ -1499,7 +1499,7 @@ void Element_Handle_Left_Rings()
                     {
                         ImageDeal[Ysite].RightBorder = Xsite;
                         // if(ImageFlag.ring_big_small==1)// 大环岛补中线
-                        ImageDeal[Ysite].Center = ((ImageDeal[Ysite].RightBorder + ImageDeal[Ysite].LeftBorder) / 2);
+                        ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder - Half_Bend_Wide[Ysite];
                         // else// 小环岛补中线
                         //     ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder - Half_Bend_Wide[Ysite];
                         if (ImageDeal[Ysite].Center < 4)
@@ -1522,13 +1522,6 @@ void Element_Handle_Left_Rings()
         }
     }
     // 小环岛出环 环内不处理
-    if (ImageFlag.image_element_rings_flag >= 2 && ImageFlag.image_element_rings_flag <= 5)
-    {
-        for (int Ysite = 59; Ysite > ImageStatus.OFFLine; Ysite--)
-        {
-            ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder - Half_Road_Wide[Ysite] + 5;
-        }
-    }
     if (ImageFlag.image_element_rings_flag == 7)
     {
     }
