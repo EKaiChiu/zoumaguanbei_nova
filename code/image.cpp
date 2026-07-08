@@ -1095,16 +1095,32 @@ void Element_Judgment_Left_Rings()
 {
     // printf("Left_Line:%d,Right_Line:%d\n", ImageStatus.Left_Line, ImageStatus.Right_Line);
     //     Disf = 0;
-    if (ImageStatus.Right_Line > 4 || ImageStatus.Left_Line < 16 // 13
-        || ImageStatus.OFFLine > 4
+    bool left_pre_right_line_ok = (ImageStatus.Right_Line <= 4);
+    bool left_pre_left_line_ok = (ImageStatus.Left_Line >= 16);
+    bool left_pre_offline_ok = (ImageStatus.OFFLine <= 4);
+    bool left_pre_whiteline_ok = (ImageStatus.WhiteLine <= 8);
+    bool left_pre_row57_ok = (ImageDeal[57].IsLeftFind != 'W');
+    bool left_pre_row58_ok = (ImageDeal[58].IsLeftFind != 'W');
+
+    printf("[RINGDBG][L][PRE] RL=%d ok=%d LL=%d ok=%d OFF=%d ok=%d WL=%d ok=%d L57=%c ok=%d L58=%c ok=%d flag=%d\r\n",
+           ImageStatus.Right_Line, left_pre_right_line_ok,
+           ImageStatus.Left_Line, left_pre_left_line_ok,
+           ImageStatus.OFFLine, left_pre_offline_ok,
+           ImageStatus.WhiteLine, left_pre_whiteline_ok,
+           ImageDeal[57].IsLeftFind, left_pre_row57_ok,
+           ImageDeal[58].IsLeftFind, left_pre_row58_ok,
+           ImageFlag.image_element_rings_flag);
+
+    if (!left_pre_right_line_ok || !left_pre_left_line_ok
+        || !left_pre_offline_ok
         //  ||variance_acc>20
         // || Straight_Judge(2, 25, 45) > 1
-        || ImageStatus.WhiteLine > 8
+        || !left_pre_whiteline_ok
         //            || (ImageDeal[48].RightBorder - ImageDeal[48].LeftBorder)<51
         // || ImageDeal[52].IsLeftFind == 'W'
         // || ImageDeal[53].IsLeftFind == 'W'
         // || ImageDeal[54].IsLeftFind == 'W'
-        || ImageDeal[57].IsLeftFind == 'W' || ImageDeal[58].IsLeftFind == 'W')
+        || !left_pre_row57_ok || !left_pre_row58_ok)
         return;
     int ring_ysite = 20;
     //  uint8 Left_Less_Num = 0;
@@ -1152,6 +1168,13 @@ void Element_Judgment_Left_Rings()
             Ring_Help_Flag = 1;
         }
     }
+    printf("[RINGDBG][L][POINT] p1=%d p2=%d p1_ok=%d p2_ok=%d help=%d flag0=%d\r\n",
+           Left_RingsFlag_Point1_Ysite,
+           Left_RingsFlag_Point2_Ysite,
+           Left_RingsFlag_Point1_Ysite > 0,
+           Left_RingsFlag_Point2_Ysite > Left_RingsFlag_Point1_Ysite + 1,
+           Ring_Help_Flag,
+           ImageFlag.image_element_rings_flag == 0);
     if (Left_RingsFlag_Point1_Ysite > 0 && Left_RingsFlag_Point2_Ysite > Left_RingsFlag_Point1_Ysite + 1 &&
         Ring_Help_Flag == 1 && ImageFlag.image_element_rings_flag == 0)
     {
