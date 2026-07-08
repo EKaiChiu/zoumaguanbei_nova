@@ -665,7 +665,7 @@ void motor_diff_pid1()
     float current_kd = 0.20f;
     if (abs_turn_error <= 3.5f)
     {
-        current_kp = diff_kp * 1.6f;
+        current_kp = diff_kp * 1.1f;
         current_kd = 0.18f;
     }
     else if (abs_turn_error >= 4.5f)
