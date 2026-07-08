@@ -665,18 +665,18 @@ void motor_diff_pid1()
     float current_kd = 0.20f;
     if (abs_turn_error <= 3.5f)
     {
-        current_kp = diff_kp * 0.75f;
-        current_kd = 0.18f;
+        current_kp = diff_kp * 0.7f;
+        current_kd = 0.12f;
     }
-    else if (abs_turn_error >= 4.5f)
+    else if (abs_turn_error >= 8.0f)
     {
-        current_kp = 16.5f; // stronger bend turn
-        current_kd = 0.48f;
+        current_kp = 9.0f; // stronger bend turn
+        current_kd = 0.30f;
     }
     else
     {
-        current_kp = diff_kp * 5.4f;
-        current_kd = 0.42f;
+        current_kp = 5.0f;
+        current_kd = 0.22f;
     }
 
     // 转向 PD 控制
@@ -698,7 +698,7 @@ void motor_diff_pid1()
         filtered_turn_output = 0.0f;
     }
 
-    float max_turn_step = (abs_turn_error >= 4.5f) ? 260.0f : 75.0f;
+    float max_turn_step = (abs_turn_error >= 8.0f) ? 220.0f : 70.0f;
     float turn_delta = turn_output - filtered_turn_output;
     if (turn_delta > max_turn_step)
         turn_delta = max_turn_step;
