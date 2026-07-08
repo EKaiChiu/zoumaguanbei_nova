@@ -655,7 +655,7 @@ void motor_diff_pid1()
     // 图像偏差（根据实际调整中线值）
     float turn_error = 40 - ImageStatus.Det_True;
     // 死区控制
-    if (turn_error > -1.0f && turn_error < 1.0f)
+    if (turn_error > -1.5f && turn_error < 1.5f)
     {
         turn_error = 0;
     }
@@ -665,8 +665,8 @@ void motor_diff_pid1()
     float current_kd = 0.20f;
     if (abs_turn_error <= 3.5f)
     {
-        current_kp = diff_kp * 2.2f;
-        current_kd = 0.28f;
+        current_kp = diff_kp * 1.6f;
+        current_kd = 0.18f;
     }
     else if (abs_turn_error >= 4.5f)
     {
@@ -708,7 +708,7 @@ void motor_diff_pid1()
     filtered_turn_output = 0.65f * filtered_turn_output + 0.35f * turn_output;
     if (abs_turn_error <= 3.0f)
     {
-        filtered_turn_output *= 0.35f;
+        filtered_turn_output *= 0.25f;
     }
 
     int current_base_speed = line_base_speed;
