@@ -1624,6 +1624,8 @@ void Element_Handle_Left_Rings()
             {
                 ImageDeal[y].RightBorder = repaired_right;
                 ImageDeal[y].Center = Left_Ring_Outward_Center(ImageDeal[y].LeftBorder, repaired_right);
+                if (ImageDeal[y].Center < 46)
+                    ImageDeal[y].Center = 46;
             }
         }
     }
@@ -1657,6 +1659,8 @@ void Element_Handle_Left_Rings()
             {
                 ImageDeal[y].RightBorder = repaired_right;
                 ImageDeal[y].Center = Left_Ring_Outward_Center(ImageDeal[y].LeftBorder, repaired_right);
+                if (ImageDeal[y].Center < 46)
+                    ImageDeal[y].Center = 46;
             }
         }
     }
