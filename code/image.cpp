@@ -1144,6 +1144,75 @@ void Search_Border_OTSU(uint8 imageInput[LCDH][LCDW], uint8 Row, uint8 Col, uint
         }
     }
 }
+
+static void Draw_Left_Ring_Guide(int y1, int x1, int y2, int x2, int thick_direction)
+{
+    if (y1 == y2)
+        return;
+
+    int y_start = (y1 < y2) ? y1 : y2;
+    int y_end = (y1 > y2) ? y1 : y2;
+    for (int y = y_start; y <= y_end; y++)
+    {
+        float ratio = (float)(y - y1) / (float)(y2 - y1);
+        int x = (int)(x1 + ratio * (x2 - x1));
+        for (int width = 0; width <= 7; width++)
+        {
+            int draw_x = x + thick_direction * width;
+            if (draw_x > 0 && draw_x < LCDW - 1)
+                Pixle[y][draw_x] = 0;
+        }
+    }
+}
+
+static int Find_Left_Ring_Upper_Corner(void)
+{
+    int top_limit = ImageStatus.OFFLine + 4;
+    if (top_limit < 5)
+        top_limit = 5;
+
+    for (int y = 50; y > top_limit; y--)
+    {
+        int x = ImageDeal[y].LeftBorder;
+        if (x - ImageDeal[y + 2].LeftBorder >= 3 &&
+            x - ImageDeal[y - 2].LeftBorder >= 3)
+            return y;
+    }
+    return 0;
+}
+
+static void Rebuild_Left_Ring_Entry_Path(bool deep_in_ring)
+{
+    int corner_y = Find_Left_Ring_Upper_Corner();
+    if (corner_y > 0)
+    {
+        int corner_x = ImageDeal[corner_y].LeftBorder;
+        if (deep_in_ring)
+        {
+            int target_y = corner_y + 20;
+            if (target_y > 57)
+                target_y = 57;
+            Draw_Left_Ring_Guide(corner_y, corner_x, target_y,
+                                 ImageDeal[target_y].RightBorder, 1);
+        }
+        else
+        {
+            int bottom_x = corner_x - (58 - corner_y) / 2;
+            if (bottom_x < 4)
+                bottom_x = 4;
+            Draw_Left_Ring_Guide(corner_y, corner_x, 58, bottom_x, -1);
+        }
+    }
+    else
+    {
+        // 开源版本无可靠角点时使用两条斜线，直接构造明显的左弯入口。
+        Draw_Left_Ring_Guide(3, 36, 58, 4, -1);
+        Draw_Left_Ring_Guide(3, 34, 58, 58, 1);
+    }
+
+    Search_Border_OTSU(Pixle, LCDH, LCDW, LCDH - 2);
+    ApplyRingSLineToMainLine();
+}
 //--------------------------------------------------------------
 //  @name           Element_Judgment_Left_Rings()
 //  @brief          通过图像判断丢左边情况，进一步判断右环岛元素.
@@ -1324,6 +1393,12 @@ void Element_Handle_Left_Rings()
             ImageDeal[Ysite + 1].IsLeftFind == 'W' && ImageDeal[Ysite].IsLeftFind == 'T')
             break;
     }
+
+    if (ImageFlag.image_element_rings_flag == 5 || ImageFlag.image_element_rings_flag == 6)
+        Rebuild_Left_Ring_Entry_Path(false);
+    else if (ImageFlag.image_element_rings_flag == 7)
+        Rebuild_Left_Ring_Entry_Path(true);
+
     //    tft180_show_int(60,125,num,3);
     //    int ring_ysite = 30;
     //    for (int Ysite = 5; Ysite < ring_ysite; Ysite++)
@@ -1473,8 +1548,9 @@ void Element_Handle_Left_Rings()
         }
     }
     // 进环 切外
-    if (ImageFlag.image_element_rings_flag == 5 || ImageFlag.image_element_rings_flag == 6 ||
+    if (false && (ImageFlag.image_element_rings_flag == 5 || ImageFlag.image_element_rings_flag == 6 ||
         ImageFlag.image_element_rings_flag == 7)
+       )
     {
         int flag_Xsite_1 = 0;
         int flag_Ysite_1 = 0;
