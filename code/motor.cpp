@@ -60,7 +60,7 @@ int speed_pwm_min_l = 750;
 int speed_pwm_min_r = 725;
 float speed_pwm_feedforward_l = 10.6f;
 float speed_pwm_feedforward_r = 10.3f;
-static int line_base_speed = 200;
+static int line_base_speed = 180;
 
 static void reset_speed_pid_state()
 {
