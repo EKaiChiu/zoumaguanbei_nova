@@ -1,6 +1,9 @@
 #ifndef AVOID_HPP
 #define AVOID_HPP
 
+// 绕行总开关：0=只鸣笛不绕行，1=启用绕行状态机。
+#define AVOID_MODE 0
+
 /* 绕行示例初始化。当前默认关闭绕行功能，避免识别到 0 后直接接管电机。 */
 void avoid_init(void);
 

@@ -64,7 +64,7 @@ void init_all()
 
     motor_init();          // 电机 PWM 初始化
     avoid_init();
-    avoid_set_enabled(true);
+    avoid_set_enabled(AVOID_MODE != 0);
     
      motor_argument();      // 🌟 必须取消注释！给目标速度和 PID 参数赋值
     

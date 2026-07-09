@@ -171,7 +171,9 @@ bool avoid_control_left(void)
 
         if (avoid_straight_ticks >= AVOID_STRAIGHT_TICKS)
         {
-            avoid_state = AVOID_TURN_LEFT_FINAL;
+            avoid_state = AVOID_IDLE;
+            latest_vision_result = -1;
+            avoid_straight_ticks = 0;
             printed_state = -1;
         }
         return true;
@@ -252,7 +254,9 @@ bool avoid_control_right(void)
 
         if (avoid_straight_ticks >= AVOID_STRAIGHT_TICKS)
         {
-            avoid_state = AVOID_TURN_LEFT_FINAL;
+            avoid_state = AVOID_IDLE;
+            latest_vision_result = -1;
+            avoid_straight_ticks = 0;
             printed_state = -1;
         }
         return true;
