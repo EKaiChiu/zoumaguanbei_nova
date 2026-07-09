@@ -24,12 +24,12 @@ enum AvoidState
 
 static const float AVOID_CONTROL_DT_S = 0.02f;
 // Avoid turn targets.
-static const float AVOID_LEFT_TARGET_DEG = 30.0f;
+static const float AVOID_LEFT_TARGET_DEG = 45.0f;
 static const float AVOID_ZERO_TARGET_DEG = 0.0f;
-static const float AVOID_RIGHT_TARGET_DEG = -30.0f;
-static const int AVOID_STRAIGHT_TICKS = 25;
-static const int16 AVOID_TURN_LEFT_SPEED_L = -160;
-static const int16 AVOID_TURN_LEFT_SPEED_R = 160;
+static const float AVOID_RIGHT_TARGET_DEG = -45.0f;
+static const int AVOID_STRAIGHT_TICKS = 70;
+static const int16 AVOID_TURN_LEFT_SPEED_L = -200;
+static const int16 AVOID_TURN_LEFT_SPEED_R = 200;
 static const int16 AVOID_TURN_RIGHT_SPEED_L = 160;
 static const int16 AVOID_TURN_RIGHT_SPEED_R = -160;
 static const int16 AVOID_STRAIGHT_SPEED = 160;

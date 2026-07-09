@@ -1091,13 +1091,13 @@ void Search_Border_OTSU(uint8 imageInput[LCDH][LCDW], uint8 Row, uint8 Col, uint
 // 左环岛判断
 void Element_Judgment_Left_Rings()
 {
-    printf("[左环岛状态1条件] 右侧丢线=%d <=2:%s 左侧丢线=%d >=20:%s OFFLine=%d <6:%s WhiteLine=%d <=5:%s L55=%c "
-           "L56=%c L57=%c L58=%c\r\n",
-           ImageStatus.Right_Line, (ImageStatus.Right_Line <= 2) ? "是" : "否", ImageStatus.Left_Line,
-           (ImageStatus.Left_Line >= 20) ? "是" : "否", ImageStatus.OFFLine, (ImageStatus.OFFLine < 6) ? "是" : "否",
-           ImageStatus.WhiteLine, (ImageStatus.WhiteLine <= 5) ? "是" : "否", ImageDeal[55].IsLeftFind,
-           ImageDeal[56].IsLeftFind, ImageDeal[57].IsLeftFind, ImageDeal[58].IsLeftFind);
-    //    Disf = 0;
+    // printf("[左环岛状态1条件] 右侧丢线=%d <=2:%s 左侧丢线=%d >=20:%s OFFLine=%d <6:%s WhiteLine=%d <=5:%s L55=%c "
+    //        "L56=%c L57=%c L58=%c\r\n",
+    //        ImageStatus.Right_Line, (ImageStatus.Right_Line <= 2) ? "是" : "否", ImageStatus.Left_Line,
+    //        (ImageStatus.Left_Line >= 20) ? "是" : "否", ImageStatus.OFFLine, (ImageStatus.OFFLine < 6) ? "是" : "否",
+    //        ImageStatus.WhiteLine, (ImageStatus.WhiteLine <= 5) ? "是" : "否", ImageDeal[55].IsLeftFind,
+    //        ImageDeal[56].IsLeftFind, ImageDeal[57].IsLeftFind, ImageDeal[58].IsLeftFind);
+    // //    Disf = 0;
     if (ImageStatus.Right_Line > 2 || ImageStatus.Left_Line < 20 // 13
         || ImageStatus.OFFLine >= 10
         //  ||variance_acc>20
