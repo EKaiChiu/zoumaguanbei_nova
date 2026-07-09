@@ -49,6 +49,7 @@ static bool Left_Ring_Yaw_Active = false;
 static int Left_Ring_Exit_Point_X = 0;
 static int Left_Ring_Exit_Point_Y = 0;
 static int Left_Ring_Exit_Point_Stable = 0;
+static int Left_Ring_Exit_Hold_Frames = 0;
 
 #define CROSS_HOLD_FRAME 7
 
@@ -1469,6 +1470,7 @@ void Element_Handle_Left_Rings()
         if (Left_Ring_Yaw_Progress() >= 335.0f)
         {
             ImageFlag.image_element_rings_flag = 9;
+            Left_Ring_Exit_Hold_Frames = 0;
             printf("[RING][L] 进入状态9 yaw=%.1f\r\n", Left_Ring_Yaw_Progress());
             // wireless_uart_send_byte(9);
         }
@@ -1481,13 +1483,14 @@ void Element_Handle_Left_Rings()
     // 环岛结束
     if (ImageFlag.image_element_rings_flag == 9)
     {
+        Left_Ring_Exit_Hold_Frames++;
         int num = 0;
         for (int Ysite = 45; Ysite > 8; Ysite--)
         {
             if (ImageDeal[Ysite].IsLeftFind == 'W')
                 num++;
         }
-        if (num < 5)
+        if (Left_Ring_Exit_Hold_Frames >= 8 && num < 5)
         {
             printf("环岛结束，进入正常道路\r\n");
             ImageStatus.Road_type = Normol; // 返回正常的道路类型 0
@@ -1496,6 +1499,7 @@ void Element_Handle_Left_Rings()
             ImageFlag.ring_big_small = 0;
             Left_Ring_Yaw_Active = false;
             Left_Ring_Yaw_Direction = 0;
+            Left_Ring_Exit_Hold_Frames = 0;
             // ImageStatus.Road_type = Normol;
             // wireless_uart_send_byte(0);
             //                gpio_set_level(Beep, 0);
@@ -1512,9 +1516,8 @@ void Element_Handle_Left_Rings()
             ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder - Half_Road_Wide[Ysite] + 8;
         }
     }
-    // 按开源版本连续接管入环路径：状态7仍保持环内补线，直到切换到状态8。
-    if (ImageFlag.image_element_rings_flag == 5 || ImageFlag.image_element_rings_flag == 6 ||
-        ImageFlag.image_element_rings_flag == 7)
+    // 状态5/6保持入环补线；状态7开始使用开源版本的出口补线。
+    if (ImageFlag.image_element_rings_flag == 5 || ImageFlag.image_element_rings_flag == 6)
     {
         int flag_Xsite_1 = 0;
         int flag_Ysite_1 = 0;
@@ -1597,35 +1600,51 @@ void Element_Handle_Left_Rings()
             }
         }
     }
-    // 左环岛出环：右侧角点连到图像右侧，并由右边线向左推算中线。
-    if (ImageFlag.image_element_rings_flag == 8 && ImageFlag.ring_big_small == 1) // 大环
+    // 开源状态4：右下出口角点连接到图像上方 x=27。
+    if (ImageFlag.image_element_rings_flag == 7 && Point_Ysite > ImageStatus.OFFLine)
     {
         int repair_y = ImageStatus.OFFLine;
-        if (repair_y < 0)
-            repair_y = 0;
-        if (repair_y >= Point_Ysite)
-            repair_y = Point_Ysite - 1;
-
-        if (Point_Ysite > repair_y)
+        float slope = (float)(Point_Xsite - 27) / (float)(Point_Ysite - repair_y);
+        for (int y = Point_Ysite; y > repair_y; y--)
         {
-            const int exit_target_x = LCDW - 3;
-            float slope = (float)(Point_Xsite - exit_target_x) / (float)(Point_Ysite - repair_y);
-            for (int Ysite = Point_Ysite; Ysite > repair_y; Ysite--)
+            int repaired_right = 27 + (int)(slope * (y - repair_y));
+            if (repaired_right > ImageDeal[y].LeftBorder + 4 && repaired_right < LCDW - 2)
             {
-                int repaired_right = exit_target_x + (int)(slope * (Ysite - repair_y));
-                if (repaired_right > 77)
-                    repaired_right = 77;
-                if (repaired_right < 0)
-                    repaired_right = 0;
-                if (repaired_right <= ImageDeal[Ysite].LeftBorder + 4)
-                    continue;
+                ImageDeal[y].RightBorder = repaired_right;
+                ImageDeal[y].Center = (ImageDeal[y].LeftBorder + repaired_right) / 2;
+            }
+        }
+    }
 
-                ImageDeal[Ysite].RightBorder = repaired_right;
-                ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder - Half_Road_Wide[Ysite];
-                if (ImageDeal[Ysite].Center < 4)
-                    ImageDeal[Ysite].Center = 4;
-                if (ImageDeal[Ysite].Center > LCDW - 5)
-                    ImageDeal[Ysite].Center = LCDW - 5;
+    // 开源状态5：从右下角向左侧白黑交界点构造出口线。
+    if (ImageFlag.image_element_rings_flag == 8 && ImageFlag.ring_big_small == 1) // 大环
+    {
+        int transition_y = 0;
+        for (int y = 54; y > ImageStatus.OFFLine + 3; y--)
+        {
+            if (ImageDeal[y + 1].IsLeftFind == 'W' && ImageDeal[y + 2].IsLeftFind == 'W' &&
+                ImageDeal[y + 3].IsLeftFind == 'W' && ImageDeal[y + 4].IsLeftFind == 'W' &&
+                ImageDeal[y + 5].IsLeftFind == 'W' && ImageDeal[y - 1].IsLeftFind == 'T')
+            {
+                transition_y = y;
+                break;
+            }
+        }
+        if (transition_y == 0)
+            transition_y = ImageStatus.OFFLine + 3;
+        if (transition_y < 3)
+            transition_y = 3;
+        if (transition_y >= 58)
+            transition_y = 57;
+
+        float slope = (float)(77 - 35) / (float)(58 - transition_y);
+        for (int y = transition_y; y <= 58; y++)
+        {
+            int repaired_right = 35 + (int)(slope * (y - transition_y));
+            if (repaired_right > ImageDeal[y].LeftBorder + 4)
+            {
+                ImageDeal[y].RightBorder = repaired_right;
+                ImageDeal[y].Center = (ImageDeal[y].LeftBorder + repaired_right) / 2;
             }
         }
     }
@@ -1651,12 +1670,37 @@ void Element_Handle_Left_Rings()
     //            (ImageDeal[Ysite].RightBorder + ImageDeal[Ysite].LeftBorder) / 2;
     //        }
     //    }
-    // 已出环 切内线
+    // 开源状态6：补左边线，防止车辆重新进入环岛。
     if (ImageFlag.image_element_rings_flag == 9 || ImageFlag.image_element_rings_flag == 10)
     {
-        for (int Ysite = 59; Ysite > ImageStatus.OFFLine; Ysite--)
+        int anchor_y = ImageStatus.OFFLine + 10;
+        if (anchor_y > 50)
+            anchor_y = 50;
+        if (anchor_y < 5)
+            anchor_y = 5;
+        int anchor_x = ImageDeal[anchor_y].LeftBorder;
+
+        for (int y = 50; y > ImageStatus.OFFLine + 3; y--)
         {
-            ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder - Half_Road_Wide[Ysite] + 8;
+            int x = ImageDeal[y].LeftBorder;
+            if (x - ImageDeal[y + 2].LeftBorder >= 3 &&
+                x - ImageDeal[y - 2].LeftBorder >= 3)
+            {
+                anchor_y = y;
+                anchor_x = x;
+                break;
+            }
+        }
+
+        float slope = (float)(7 - anchor_x) / (float)(58 - anchor_y);
+        for (int y = anchor_y; y <= 58; y++)
+        {
+            int repaired_left = anchor_x + (int)(slope * (y - anchor_y));
+            if (repaired_left >= 1 && repaired_left < ImageDeal[y].RightBorder - 4)
+            {
+                ImageDeal[y].LeftBorder = repaired_left;
+                ImageDeal[y].Center = (repaired_left + ImageDeal[y].RightBorder) / 2;
+            }
         }
     }
 }
