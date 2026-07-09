@@ -110,6 +110,32 @@ static float Left_Ring_Yaw_Progress(void)
     return Left_Ring_Yaw_Accumulated;
 }
 
+static bool Left_Ring_Exit_Image_Ready(void)
+{
+    int lower_both_found = 0;
+    int lower_right_found = 0;
+    int valid_width_rows = 0;
+
+    for (int y = 40; y <= 58; y++)
+    {
+        if (ImageDeal[y].IsRightFind == 'T')
+            lower_right_found++;
+        if (ImageDeal[y].Wide >= 18)
+            valid_width_rows++;
+    }
+
+    for (int y = 52; y <= 58; y++)
+    {
+        if (ImageDeal[y].IsLeftFind == 'T' && ImageDeal[y].IsRightFind == 'T')
+            lower_both_found++;
+    }
+
+    return (ImageStatus.OFFLine <= 8 &&
+            lower_both_found >= 4 &&
+            lower_right_found >= 10 &&
+            valid_width_rows >= 10);
+}
+
 uint8 Half_Road_Wide[60] = // 直道半宽度
     {5,  6,  6,  6,  7,  7,  7,  8,  8,  8,  9,  9,  10, 10, 10, 11, 11, 12, 12, 12,
      13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 20, 20, 21, 21, 22, 22,
@@ -1453,7 +1479,10 @@ void Element_Handle_Left_Rings()
     if (ImageFlag.image_element_rings_flag == 8)
     {
         // 完成环岛的大部分转角后进入出环收尾，避免仅凭丢线误判。
-        if (Left_Ring_Yaw_Progress() >= 335.0f)
+        float ring_yaw = Left_Ring_Yaw_Progress();
+        bool exit_ready_by_yaw = (ring_yaw >= 335.0f);
+        bool exit_ready_by_image = (ring_yaw >= 285.0f && Left_Ring_Exit_Image_Ready());
+        if (exit_ready_by_yaw || exit_ready_by_image)
         {
             ImageFlag.image_element_rings_flag = 9;
             Left_Ring_Exit_Hold_Frames = 0;
