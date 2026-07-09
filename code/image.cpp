@@ -46,9 +46,6 @@ static float Left_Ring_Yaw_Last = 0.0f;
 static float Left_Ring_Yaw_Accumulated = 0.0f;
 static int Left_Ring_Yaw_Direction = 0;
 static bool Left_Ring_Yaw_Active = false;
-static int Left_Ring_Exit_Point_X = 0;
-static int Left_Ring_Exit_Point_Y = 0;
-static int Left_Ring_Exit_Point_Stable = 0;
 static int Left_Ring_Exit_Hold_Frames = 0;
 
 #define CROSS_HOLD_FRAME 7
@@ -1389,9 +1386,6 @@ void Element_Handle_Left_Rings()
     if (ImageFlag.image_element_rings_flag == 6 && Left_Ring_Yaw_Progress() >= 105.0f)
     {
         ImageFlag.image_element_rings_flag = 7;
-        Left_Ring_Exit_Point_X = 0;
-        Left_Ring_Exit_Point_Y = 0;
-        Left_Ring_Exit_Point_Stable = 0;
         printf("[RING][L] 进入状态7 yaw=%.1f\n", Left_Ring_Yaw_Progress());
         // wireless_uart_send_byte(8);
     }
@@ -1400,49 +1394,31 @@ void Element_Handle_Left_Rings()
     {
         Point_Ysite = 0;
         Point_Xsite = 0;
-        for (int Ysite = 50; Ysite > ImageStatus.OFFLine + 3; Ysite--)
+        int min_right_x = LCDW;
+        int search_start = ImageStatus.OFFLine + 2;
+        if (search_start < 2)
+            search_start = 2;
+
+        for (int Ysite = search_start; Ysite < 54; Ysite++)
         {
             int candidate_x = ImageDeal[Ysite].RightBorder;
-            if (candidate_x > 5 && candidate_x < LCDW - 4 &&
-                ImageDeal[Ysite + 3].RightBorder - candidate_x >= 2 &&
-                ImageDeal[Ysite - 3].RightBorder - candidate_x >= 2 &&
-                ImageDeal[Ysite].RightBorder <= ImageDeal[Ysite + 2].RightBorder &&
-                ImageDeal[Ysite].RightBorder <= ImageDeal[Ysite - 2].RightBorder &&
-                ImageDeal[Ysite].RightBorder <= ImageDeal[Ysite + 1].RightBorder &&
-                ImageDeal[Ysite].RightBorder <= ImageDeal[Ysite - 1].RightBorder)
+            if (candidate_x < min_right_x)
             {
-                Point_Xsite = candidate_x;
+                min_right_x = candidate_x;
                 Point_Ysite = Ysite;
-                break;
             }
         }
-
         if (Point_Ysite > 0)
         {
-            int dx = Point_Xsite - Left_Ring_Exit_Point_X;
-            int dy = Point_Ysite - Left_Ring_Exit_Point_Y;
-            if (dx < 0)
-                dx = -dx;
-            if (dy < 0)
-                dy = -dy;
-
-            if (Left_Ring_Exit_Point_Stable > 0 && dx <= 4 && dy <= 3)
-                Left_Ring_Exit_Point_Stable++;
-            else
-                Left_Ring_Exit_Point_Stable = 1;
-
-            Left_Ring_Exit_Point_X = Point_Xsite;
-            Left_Ring_Exit_Point_Y = Point_Ysite;
-        }
-        else
-        {
-            Left_Ring_Exit_Point_Stable = 0;
+            Point_Xsite = min_right_x - 3;
+            if (Point_Xsite < 1)
+                Point_Xsite = 1;
         }
 
         // 开源版本以 yaw 为主要出环条件；角点缺失时使用当前右边线作为兜底。
         if (Left_Ring_Yaw_Progress() >= 250.0f)
         {
-            if (Point_Ysite <= 20 || Left_Ring_Exit_Point_Stable < 3)
+            if (Point_Ysite == 0)
             {
                 Point_Ysite = 35;
                 Point_Xsite = ImageDeal[Point_Ysite].RightBorder;
