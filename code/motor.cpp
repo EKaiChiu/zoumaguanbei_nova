@@ -652,6 +652,16 @@ void motor_diff_pid1()
     static float last_turn_error = 0;
     static float filtered_turn_output = 0;
 
+    // 左环岛状态8由yaw状态机控制，直接接管差速并强制向左出环。
+    if (ImageStatus.Road_type == LeftCirque && ImageFlag.image_element_rings_flag == 8)
+    {
+        diff_speedl_expect = -60;
+        diff_speedr_expect = 180;
+        last_turn_error = 0.0f;
+        filtered_turn_output = 0.0f;
+        return;
+    }
+
     // 图像偏差（根据实际调整中线值）
     float turn_error = 40 - ImageStatus.Det_True;
     // 死区控制
