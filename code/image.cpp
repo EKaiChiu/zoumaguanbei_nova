@@ -1,4 +1,5 @@
 #include "image.hpp"
+#include "imu660.hpp"
 
 static uint8 border_point;
 static uint8 top_point;
@@ -40,7 +41,63 @@ static uint8 Cross_Lock_Cnt = 0;
 static int Cross_Left_Up_Find = 0;
 static int Cross_Right_Up_Find = 0;
 
+static float Left_Ring_Yaw_Start = 0.0f;
+static float Left_Ring_Yaw_Last = 0.0f;
+static float Left_Ring_Yaw_Accumulated = 0.0f;
+static int Left_Ring_Yaw_Direction = 0;
+static bool Left_Ring_Yaw_Active = false;
+
 #define CROSS_HOLD_FRAME 7
+
+static float Wrap_Yaw_180(float yaw)
+{
+    while (yaw > 180.0f)
+        yaw -= 360.0f;
+    while (yaw < -180.0f)
+        yaw += 360.0f;
+    return yaw;
+}
+
+static void Left_Ring_Yaw_Start_Tracking(void)
+{
+    Left_Ring_Yaw_Start = imu_get_integrated_yaw();
+    Left_Ring_Yaw_Last = Left_Ring_Yaw_Start;
+    Left_Ring_Yaw_Accumulated = 0.0f;
+    Left_Ring_Yaw_Direction = 0;
+    Left_Ring_Yaw_Active = true;
+}
+
+static float Left_Ring_Yaw_Progress(void)
+{
+    if (!Left_Ring_Yaw_Active)
+        return 0.0f;
+
+    float current_yaw = imu_get_integrated_yaw();
+    float delta = Wrap_Yaw_180(current_yaw - Left_Ring_Yaw_Start);
+    float abs_delta = (delta < 0.0f) ? -delta : delta;
+    if (Left_Ring_Yaw_Direction == 0 && abs_delta >= 8.0f)
+    {
+        Left_Ring_Yaw_Direction = (delta >= 0.0f) ? 1 : -1;
+        Left_Ring_Yaw_Accumulated = abs_delta;
+        Left_Ring_Yaw_Last = current_yaw;
+        return Left_Ring_Yaw_Accumulated;
+    }
+
+    if (Left_Ring_Yaw_Direction == 0)
+    {
+        Left_Ring_Yaw_Last = current_yaw;
+        return abs_delta;
+    }
+
+    float step = Wrap_Yaw_180(current_yaw - Left_Ring_Yaw_Last) * Left_Ring_Yaw_Direction;
+    Left_Ring_Yaw_Last = current_yaw;
+    if (step > 0.0f)
+        Left_Ring_Yaw_Accumulated += step;
+    if (Left_Ring_Yaw_Accumulated > 360.0f)
+        Left_Ring_Yaw_Accumulated = 360.0f;
+
+    return Left_Ring_Yaw_Accumulated;
+}
 
 uint8 Half_Road_Wide[60] = // 直道半宽度
     {5,  6,  6,  6,  7,  7,  7,  8,  8,  8,  9,  9,  10, 10, 10, 11, 11, 12, 12, 12,
@@ -1304,6 +1361,7 @@ void Element_Handle_Left_Rings()
     {
 
         ImageFlag.image_element_rings_flag = 5;
+        Left_Ring_Yaw_Start_Tracking();
         printf("进入状态5\r\n");
         // wireless_uart_send_byte(5);
     }
@@ -1317,17 +1375,11 @@ void Element_Handle_Left_Rings()
     }
 
     // 小环岛出环
-    // 状态6：打印调试信息
-    if (ImageFlag.image_element_rings_flag == 6)
-    {
-        printf("[RING][STATE6] Right_Line = %d\n", ImageStatus.Right_Line);
-    }
-
-    // 状态6 → 状态7 转换条件
-    if (ImageFlag.image_element_rings_flag == 6 && ImageStatus.Right_Line < 4)
+    // 参考 yaw 出环法：入环后转过约 105 度，才开始寻找出口。
+    if (ImageFlag.image_element_rings_flag == 6 && Left_Ring_Yaw_Progress() >= 105.0f)
     {
         ImageFlag.image_element_rings_flag = 7;
-        printf("[RING] 进入状态7\n");
+        printf("[RING][L] 进入状态7 yaw=%.1f\n", Left_Ring_Yaw_Progress());
         // wireless_uart_send_byte(8);
     }
     // 出环 环岛顶点判断
@@ -1350,10 +1402,12 @@ void Element_Handle_Left_Rings()
                 break;
             }
         }
-        if (Point_Ysite > 20)
+        // 参考程序在绕行约 250 度后才进入出口补线阶段。
+        if (Point_Ysite > 20 && Left_Ring_Yaw_Progress() >= 250.0f)
         {
             ImageFlag.image_element_rings_flag = 8;
-            printf("进入状态8\r\n");
+            printf("[RING][L] 进入状态8 yaw=%.1f point=(%d,%d)\r\n",
+                   Left_Ring_Yaw_Progress(), Point_Xsite, Point_Ysite);
             // wireless_uart_send_byte(8);
             // Stop = 1;
         }
@@ -1380,12 +1434,11 @@ void Element_Handle_Left_Rings()
     // 出环
     if (ImageFlag.image_element_rings_flag == 8)
     {
-        if (
-            // Straight_Judge(2, ImageStatus.OFFLine+15, 50) < 1
-            ImageStatus.Right_Line < 7  // 出于对国赛工字环岛考虑，进环后补直线过渡，增强适应性
-            && ImageStatus.OFFLine < 6) // 右边为直线且截止行（前瞻值）较小
+        // 完成环岛的大部分转角后进入出环收尾，避免仅凭丢线误判。
+        if (Left_Ring_Yaw_Progress() >= 335.0f)
         {
             ImageFlag.image_element_rings_flag = 9;
+            printf("[RING][L] 进入状态9 yaw=%.1f\r\n", Left_Ring_Yaw_Progress());
             // wireless_uart_send_byte(9);
         }
         //             else if(gyro_yaw>300)
@@ -1410,6 +1463,8 @@ void Element_Handle_Left_Rings()
             ImageFlag.image_element_rings_flag = 0;
             ImageFlag.image_element_rings = 0;
             ImageFlag.ring_big_small = 0;
+            Left_Ring_Yaw_Active = false;
+            Left_Ring_Yaw_Direction = 0;
             // ImageStatus.Road_type = Normol;
             // wireless_uart_send_byte(0);
             //                gpio_set_level(Beep, 0);
@@ -1525,10 +1580,11 @@ void Element_Handle_Left_Rings()
 
         if (Point_Ysite > repair_y)
         {
-            float slope = (float)Point_Xsite / (float)(Point_Ysite - repair_y);
+            const int exit_target_x = 27;
+            float slope = (float)(Point_Xsite - exit_target_x) / (float)(Point_Ysite - repair_y);
             for (int Ysite = Point_Ysite; Ysite > repair_y; Ysite--)
             {
-                ImageDeal[Ysite].RightBorder = (int)(slope * (Ysite - repair_y));
+                ImageDeal[Ysite].RightBorder = exit_target_x + (int)(slope * (Ysite - repair_y));
                 if (ImageDeal[Ysite].RightBorder > 77)
                     ImageDeal[Ysite].RightBorder = 77;
                 if (ImageDeal[Ysite].RightBorder < 0)

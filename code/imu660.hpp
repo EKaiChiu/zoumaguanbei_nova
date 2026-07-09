@@ -172,5 +172,6 @@ void imu_yaw_print_reset(void);
 example：    imu_yaw_print_task(imu_dev, 0.02f);
 */
 void imu_yaw_print_task(zf_device_imu &imu_dev, float dt_s);
+float imu_get_integrated_yaw(void);
 
 #endif // __IMU660_HPP__

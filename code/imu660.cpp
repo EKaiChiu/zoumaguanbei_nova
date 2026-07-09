@@ -292,3 +292,8 @@ void imu_yaw_print_task(zf_device_imu &imu_dev, float dt_s)
         }
     }
 }
+
+float imu_get_integrated_yaw(void)
+{
+    return imu_yaw_print_deg;
+}
