@@ -1184,6 +1184,7 @@ void Element_Judgment_Left_Rings()
         if (ImageDeal[Ysite].LeftBoundary_First - ImageDeal[Ysite - 1].LeftBoundary_First > 4)
         {
             Left_RingsFlag_Point1_Ysite = Ysite;
+            printf("左侧点1的Y值:%d\n", Left_RingsFlag_Point1_Ysite);
             break;
         }
     }
@@ -1192,12 +1193,14 @@ void Element_Judgment_Left_Rings()
         if (ImageDeal[Ysite + 1].LeftBoundary - ImageDeal[Ysite].LeftBoundary > 4)
         {
             Left_RingsFlag_Point2_Ysite = Ysite;
+            printf("左侧点2的Y值:%d\n", Left_RingsFlag_Point2_Ysite);
             break;
         }
     }
 
     for (int Ysite = Left_RingsFlag_Point1_Ysite; Ysite > ImageStatus.OFFLine; Ysite--)
     {
+        printf("正在查找Ysite:%d   ", Ysite);
         // if (ImageDeal[Ysite + 3].LeftBoundary_First < ImageDeal[Ysite].LeftBoundary_First &&
         //     ImageDeal[Ysite + 2].LeftBoundary_First < ImageDeal[Ysite].LeftBoundary_First &&
         //     ImageDeal[Ysite].LeftBoundary_First > ImageDeal[Ysite - 1].LeftBoundary_First &&
@@ -1209,7 +1212,12 @@ void Element_Judgment_Left_Rings()
         {
 
             Ring_Help_Flag = 1;
+            printf("左侧上角点Y值:%d\n", Ysite);
             break;
+        }
+        else
+        {
+            printf("没找到\n");
         }
     }
 
@@ -1381,6 +1389,7 @@ void Element_Handle_Left_Rings()
         Point_Xsite = 0;
         for (int Ysite = 50; Ysite > ImageStatus.OFFLine + 3; Ysite--)
         {
+            printf("环岛顶点的Y值:%d\n", Point_Ysite);
             if (ImageDeal[Ysite].RightBorder <= ImageDeal[Ysite + 2].RightBorder &&
                 ImageDeal[Ysite].RightBorder <= ImageDeal[Ysite - 2].RightBorder &&
                 ImageDeal[Ysite].RightBorder <= ImageDeal[Ysite + 1].RightBorder &&
@@ -1473,8 +1482,7 @@ void Element_Handle_Left_Rings()
         }
     }
     // 进环 切外
-    if (ImageFlag.image_element_rings_flag == 5 || ImageFlag.image_element_rings_flag == 6 ||
-        ImageFlag.image_element_rings_flag == 7)
+    if (ImageFlag.image_element_rings_flag == 5 || ImageFlag.image_element_rings_flag == 6)
     {
         int flag_Xsite_1 = 0;
         int flag_Ysite_1 = 0;
