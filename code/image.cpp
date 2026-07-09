@@ -62,6 +62,16 @@ static float Wrap_Yaw_180(float yaw)
     return yaw;
 }
 
+static int Left_Ring_Outward_Center(int left, int right)
+{
+    int center = (left + right) / 2 + 4;
+    if (center < 4)
+        center = 4;
+    if (center > LCDW - 5)
+        center = LCDW - 5;
+    return center;
+}
+
 static void Left_Ring_Yaw_Start_Tracking(void)
 {
     Left_Ring_Yaw_Start = imu_get_integrated_yaw();
@@ -1562,7 +1572,8 @@ void Element_Handle_Left_Rings()
             {
                 ImageDeal[Ysite].RightBorder = flag_Xsite_1 + Slope_Rings * (Ysite - flag_Ysite_1);
                 // if(ImageFlag.ring_big_small==1)// 大环岛补中线
-                ImageDeal[Ysite].Center = ((ImageDeal[Ysite].RightBorder + ImageDeal[Ysite].LeftBorder) / 2);
+                ImageDeal[Ysite].Center =
+                    Left_Ring_Outward_Center(ImageDeal[Ysite].LeftBorder, ImageDeal[Ysite].RightBorder);
                 // else// 小环岛补中线
                 //     ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder - Half_Bend_Wide[Ysite];
                 if (ImageDeal[Ysite].Center < 4)
@@ -1578,7 +1589,8 @@ void Element_Handle_Left_Rings()
                     {
                         ImageDeal[Ysite].RightBorder = Xsite;
                         // if(ImageFlag.ring_big_small==1)// 大环岛补中线
-                        ImageDeal[Ysite].Center = ((ImageDeal[Ysite].RightBorder + ImageDeal[Ysite].LeftBorder) / 2);
+                        ImageDeal[Ysite].Center =
+                            Left_Ring_Outward_Center(ImageDeal[Ysite].LeftBorder, ImageDeal[Ysite].RightBorder);
                         // else// 小环岛补中线
                         //     ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder - Half_Bend_Wide[Ysite];
                         if (ImageDeal[Ysite].Center < 4)
@@ -1611,7 +1623,7 @@ void Element_Handle_Left_Rings()
             if (repaired_right > ImageDeal[y].LeftBorder + 4 && repaired_right < LCDW - 2)
             {
                 ImageDeal[y].RightBorder = repaired_right;
-                ImageDeal[y].Center = (ImageDeal[y].LeftBorder + repaired_right) / 2;
+                ImageDeal[y].Center = Left_Ring_Outward_Center(ImageDeal[y].LeftBorder, repaired_right);
             }
         }
     }
@@ -1644,7 +1656,7 @@ void Element_Handle_Left_Rings()
             if (repaired_right > ImageDeal[y].LeftBorder + 4)
             {
                 ImageDeal[y].RightBorder = repaired_right;
-                ImageDeal[y].Center = (ImageDeal[y].LeftBorder + repaired_right) / 2;
+                ImageDeal[y].Center = Left_Ring_Outward_Center(ImageDeal[y].LeftBorder, repaired_right);
             }
         }
     }
@@ -1699,7 +1711,7 @@ void Element_Handle_Left_Rings()
             if (repaired_left >= 1 && repaired_left < ImageDeal[y].RightBorder - 4)
             {
                 ImageDeal[y].LeftBorder = repaired_left;
-                ImageDeal[y].Center = (repaired_left + ImageDeal[y].RightBorder) / 2;
+                ImageDeal[y].Center = Left_Ring_Outward_Center(repaired_left, ImageDeal[y].RightBorder);
             }
         }
     }
