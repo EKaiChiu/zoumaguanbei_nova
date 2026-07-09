@@ -651,16 +651,23 @@ void motor_diff_pid1()
 {
     static float last_turn_error = 0;
     static float filtered_turn_output = 0;
+    static bool left_ring_force_active = false;
 
     // 左环岛状态8由yaw状态机控制，直接接管差速并强制向左出环。
-    if (ImageStatus.Road_type == LeftCirque && ImageFlag.image_element_rings_flag == 8)
+    if (ImageFlag.image_element_rings == 1 && ImageFlag.image_element_rings_flag == 8)
     {
-        diff_speedl_expect = -60;
-        diff_speedr_expect = 180;
+        if (!left_ring_force_active)
+        {
+            printf("[RING][MOTOR] force left L=-200 R=200\r\n");
+            left_ring_force_active = true;
+        }
+        diff_speedl_expect = -200;
+        diff_speedr_expect = 200;
         last_turn_error = 0.0f;
         filtered_turn_output = 0.0f;
         return;
     }
+    left_ring_force_active = false;
 
     // 图像偏差（根据实际调整中线值）
     float turn_error = 40 - ImageStatus.Det_True;
