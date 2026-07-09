@@ -655,8 +655,8 @@ void motor_diff_pid1()
     // 左环岛状态8由yaw状态机控制，直接接管差速并强制向左出环。
     if (ImageStatus.Road_type == LeftCirque && ImageFlag.image_element_rings_flag == 8)
     {
-        diff_speedl_expect = -60;
-        diff_speedr_expect = 180;
+        diff_speedl_expect = -100;
+        diff_speedr_expect = 220;
         last_turn_error = 0.0f;
         filtered_turn_output = 0.0f;
         return;
@@ -692,6 +692,10 @@ void motor_diff_pid1()
     // 转向 PD 控制
 
     float turn_output = current_kp * turn_error + current_kd * (turn_error - last_turn_error);
+    bool ring_turning = (ImageFlag.image_element_rings_flag >= 5 &&
+                         ImageFlag.image_element_rings_flag <= 8);
+    if (ring_turning)
+        turn_output *= 1.30f;
     bool turn_cross_zero = (turn_error * last_turn_error) < 0.0f;
     last_turn_error = turn_error;
 
