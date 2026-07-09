@@ -72,6 +72,21 @@ static int Left_Ring_Outward_Center(int left, int right)
     return center;
 }
 
+static void Force_Left_Ring_Exit_Center(void)
+{
+    int start_y = ImageStatus.OFFLine;
+    if (start_y < 0)
+        start_y = 0;
+    if (start_y > 58)
+        start_y = 58;
+
+    for (int y = start_y; y <= 58; y++)
+    {
+        if (ImageDeal[y].Center < 46)
+            ImageDeal[y].Center = 46;
+    }
+}
+
 static void Left_Ring_Yaw_Start_Tracking(void)
 {
     Left_Ring_Yaw_Start = imu_get_integrated_yaw();
@@ -1719,6 +1734,11 @@ void Element_Handle_Left_Rings()
             }
         }
     }
+
+    // GetDet会读取前瞻附近多行；将出环方向同步到全部有效行，避免仍读取旧中线。
+    if (ImageFlag.image_element_rings_flag == 7 || ImageFlag.image_element_rings_flag == 8 ||
+        ImageFlag.image_element_rings_flag == 9)
+        Force_Left_Ring_Exit_Center();
 }
 //--------------------------------------------------------------
 //  @name           Element_Handle_Right_Rings()
