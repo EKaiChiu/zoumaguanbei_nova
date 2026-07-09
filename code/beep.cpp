@@ -10,6 +10,16 @@ void beep_short(void)
     beep_gpio.set_level(0);
 }
 
+void beep_times(int count)
+{
+    for (int i = 0; i < count; i++)
+    {
+        beep_short();
+        if (i + 1 < count)
+            system_delay_ms(100);
+    }
+}
+
 void beep_on(void)
 {
     beep_gpio.set_level(1);

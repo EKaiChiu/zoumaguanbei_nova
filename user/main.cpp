@@ -282,13 +282,13 @@ int main()
                 vision_frame_counter = 0;
                 int vision_result = vision_get_from_rgb565(rgb_image, UVC_WIDTH, UVC_HEIGHT);
                 static bool vision_beep_latched = false;
-                if (vision_result != -1)
+                if (vision_result >= 0 && vision_result <= 2)
                 {
                     avoid_set_vision_result(vision_result);
                     printf("vision_get() result: %d\n", vision_result);
                     if (!vision_beep_latched)
                     {
-                        beep_short();
+                        beep_times(vision_result + 1);
                         vision_beep_latched = true;
                     }
                 }
