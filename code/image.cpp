@@ -1481,8 +1481,9 @@ void Element_Handle_Left_Rings()
             ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder - Half_Road_Wide[Ysite] + 8;
         }
     }
-    // 进环 切外
-    if (ImageFlag.image_element_rings_flag == 5 || ImageFlag.image_element_rings_flag == 6)
+    // 按开源版本连续接管入环路径：状态7仍保持环内补线，直到切换到状态8。
+    if (ImageFlag.image_element_rings_flag == 5 || ImageFlag.image_element_rings_flag == 6 ||
+        ImageFlag.image_element_rings_flag == 7)
     {
         int flag_Xsite_1 = 0;
         int flag_Ysite_1 = 0;
@@ -1564,10 +1565,6 @@ void Element_Handle_Left_Rings()
                 }
             }
         }
-    }
-    // 小环岛出环 环内不处理
-    if (ImageFlag.image_element_rings_flag == 7)
-    {
     }
     // 大环岛出环补线：右侧角点连到OFFLine最左侧，不再根据弯道宽度推线
     if (ImageFlag.image_element_rings_flag == 8 && ImageFlag.ring_big_small == 1) // 大环
