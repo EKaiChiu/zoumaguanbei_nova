@@ -1191,7 +1191,6 @@ void Element_Judgment_Left_Rings()
         if (ImageDeal[Ysite].LeftBoundary_First - ImageDeal[Ysite - 1].LeftBoundary_First > 4)
         {
             Left_RingsFlag_Point1_Ysite = Ysite;
-            printf("左侧点1的Y值:%d\n", Left_RingsFlag_Point1_Ysite);
             break;
         }
     }
@@ -1200,14 +1199,12 @@ void Element_Judgment_Left_Rings()
         if (ImageDeal[Ysite + 1].LeftBoundary - ImageDeal[Ysite].LeftBoundary > 4)
         {
             Left_RingsFlag_Point2_Ysite = Ysite;
-            printf("左侧点2的Y值:%d\n", Left_RingsFlag_Point2_Ysite);
             break;
         }
     }
 
     for (int Ysite = Left_RingsFlag_Point1_Ysite; Ysite > ImageStatus.OFFLine; Ysite--)
     {
-        printf("正在查找Ysite:%d   ", Ysite);
         // if (ImageDeal[Ysite + 3].LeftBoundary_First < ImageDeal[Ysite].LeftBoundary_First &&
         //     ImageDeal[Ysite + 2].LeftBoundary_First < ImageDeal[Ysite].LeftBoundary_First &&
         //     ImageDeal[Ysite].LeftBoundary_First > ImageDeal[Ysite - 1].LeftBoundary_First &&
@@ -1219,12 +1216,7 @@ void Element_Judgment_Left_Rings()
         {
 
             Ring_Help_Flag = 1;
-            printf("左侧上角点Y值:%d\n", Ysite);
             break;
-        }
-        else
-        {
-            printf("没找到\n");
         }
     }
 
@@ -1436,10 +1428,14 @@ void Element_Handle_Left_Rings()
             Left_Ring_Exit_Point_Stable = 0;
         }
 
-        // 参考程序在绕行约 250 度后才进入出口补线阶段。
-        if (Point_Ysite > 20 && Left_Ring_Exit_Point_Stable >= 3 &&
-            Left_Ring_Yaw_Progress() >= 250.0f)
+        // 开源版本以 yaw 为主要出环条件；角点缺失时使用当前右边线作为兜底。
+        if (Left_Ring_Yaw_Progress() >= 250.0f)
         {
+            if (Point_Ysite <= 20 || Left_Ring_Exit_Point_Stable < 3)
+            {
+                Point_Ysite = 35;
+                Point_Xsite = ImageDeal[Point_Ysite].RightBorder;
+            }
             ImageFlag.image_element_rings_flag = 8;
             printf("[RING][L] 进入状态8 yaw=%.1f point=(%d,%d)\r\n",
                    Left_Ring_Yaw_Progress(), Point_Xsite, Point_Ysite);
