@@ -670,7 +670,7 @@ void motor_diff_pid1()
     }
     else if (abs_turn_error >= 8.0f)
     {
-        current_kp = 7.0f; // stronger bend turn
+        current_kp = 9.0f; // stronger bend turn
         current_kd = 0.30f;
     }
     else
