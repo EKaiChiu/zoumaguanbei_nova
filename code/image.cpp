@@ -123,6 +123,10 @@ float my_abs(float x)
 
 static void ApplyRingSLineToMainLine(void)
 {
+    // 左环岛使用普通巡线边界，右环岛继续保留S型边界。
+    if (ImageStatus.Road_type == LeftCirque || ImageFlag.image_element_rings == 1)
+        return;
+
     if (ImageFlag.image_element_rings_flag == 0 && ImageStatus.Road_type != LeftCirque &&
         ImageStatus.Road_type != RightCirque)
         return;
