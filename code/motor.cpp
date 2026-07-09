@@ -715,8 +715,8 @@ void motor_diff_pid1()
     bool ring_detected = (ImageStatus.Road_type == LeftCirque ||
                           ImageStatus.Road_type == RightCirque ||
                           ImageFlag.image_element_rings_flag != 0);
-    if (ring_detected && current_base_speed > 150)
-        current_base_speed = 150;
+    if (ring_detected && current_base_speed > 180)
+        current_base_speed = 180;
     if (abs_turn_error > 3.0f)
         current_base_speed -= (int)((abs_turn_error - 3.0f) * 9.0f);
     if (abs_turn_error >= 12.0f && current_base_speed > 60)
