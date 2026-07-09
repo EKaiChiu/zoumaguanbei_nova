@@ -1597,7 +1597,7 @@ void Element_Handle_Left_Rings()
             }
         }
     }
-    // 大环岛出环补线：右侧角点连到OFFLine最左侧，不再根据弯道宽度推线
+    // 左环岛出环：右侧角点连到图像右侧，并由右边线向左推算中线。
     if (ImageFlag.image_element_rings_flag == 8 && ImageFlag.ring_big_small == 1) // 大环
     {
         int repair_y = ImageStatus.OFFLine;
@@ -1608,7 +1608,7 @@ void Element_Handle_Left_Rings()
 
         if (Point_Ysite > repair_y)
         {
-            const int exit_target_x = 27;
+            const int exit_target_x = LCDW - 3;
             float slope = (float)(Point_Xsite - exit_target_x) / (float)(Point_Ysite - repair_y);
             for (int Ysite = Point_Ysite; Ysite > repair_y; Ysite--)
             {
@@ -1621,7 +1621,11 @@ void Element_Handle_Left_Rings()
                     continue;
 
                 ImageDeal[Ysite].RightBorder = repaired_right;
-                ImageDeal[Ysite].Center = (ImageDeal[Ysite].RightBorder + ImageDeal[Ysite].LeftBorder) / 2;
+                ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder - Half_Road_Wide[Ysite];
+                if (ImageDeal[Ysite].Center < 4)
+                    ImageDeal[Ysite].Center = 4;
+                if (ImageDeal[Ysite].Center > LCDW - 5)
+                    ImageDeal[Ysite].Center = LCDW - 5;
             }
         }
     }
