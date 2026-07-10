@@ -36,10 +36,6 @@ int Repair_Point_Xsite, Repair_Point_Ysite;                                     
 uint8_t *binar;                                                                     // 灰度图像数组指针
 ROIRegionTypedef LargestWhiteRegion;
 
-static uint8 Cross_Lock_Flag = 0;
-static uint8 Cross_Lock_Cnt = 0;
-static int Cross_Left_Up_Find = 0;
-static int Cross_Right_Up_Find = 0;
 
 static float Left_Ring_Yaw_Start = 0.0f;
 static float Left_Ring_Yaw_Last = 0.0f;
@@ -48,7 +44,6 @@ static int Left_Ring_Yaw_Direction = 0;
 static bool Left_Ring_Yaw_Active = false;
 static int Left_Ring_Exit_Hold_Frames = 0;
 
-#define CROSS_HOLD_FRAME 7
 
 static float Wrap_Yaw_180(float yaw)
 {
@@ -1971,219 +1966,21 @@ void Element_Handle_Right_Rings()
 }
 
 // 元素测试函数
-static void Cross_Find_Up_Point(int start, int end)
-{
-    int i;
-    int t;
-
-    Cross_Left_Up_Find = 0;
-    Cross_Right_Up_Find = 0;
-
-    if (start < end)
-    {
-        t = start;
-        start = end;
-        end = t;
-    }
-
-    if (start > 54)
-        start = 54;
-    if (end < ImageStatus.OFFLine + 5)
-        end = ImageStatus.OFFLine + 5;
-
-    for (i = start; i >= end; i--)
-    {
-        if (Cross_Left_Up_Find == 0 &&
-            ImageDeal[i].IsLeftFind == 'T' &&
-            ImageDeal[i - 1].IsLeftFind == 'T' &&
-            ImageDeal[i - 2].IsLeftFind == 'T' &&
-            abs(ImageDeal[i].LeftBorder - ImageDeal[i - 1].LeftBorder) <= 5 &&
-            abs(ImageDeal[i - 1].LeftBorder - ImageDeal[i - 2].LeftBorder) <= 5 &&
-            abs(ImageDeal[i - 2].LeftBorder - ImageDeal[i - 3].LeftBorder) <= 5 &&
-            (ImageDeal[i].LeftBorder - ImageDeal[i + 2].LeftBorder) >= 8 &&
-            (ImageDeal[i].LeftBorder - ImageDeal[i + 3].LeftBorder) >= 12)
-        {
-            Cross_Left_Up_Find = i;
-        }
-
-        if (Cross_Right_Up_Find == 0 &&
-            ImageDeal[i].IsRightFind == 'T' &&
-            ImageDeal[i - 1].IsRightFind == 'T' &&
-            ImageDeal[i - 2].IsRightFind == 'T' &&
-            abs(ImageDeal[i].RightBorder - ImageDeal[i - 1].RightBorder) <= 5 &&
-            abs(ImageDeal[i - 1].RightBorder - ImageDeal[i - 2].RightBorder) <= 5 &&
-            abs(ImageDeal[i - 2].RightBorder - ImageDeal[i - 3].RightBorder) <= 5 &&
-            (ImageDeal[i].RightBorder - ImageDeal[i + 2].RightBorder) <= -8 &&
-            (ImageDeal[i].RightBorder - ImageDeal[i + 3].RightBorder) <= -12)
-        {
-            Cross_Right_Up_Find = i;
-        }
-
-        if (Cross_Left_Up_Find != 0 && Cross_Right_Up_Find != 0)
-            break;
-    }
-
-    if (Cross_Left_Up_Find == 0)
-    {
-        for (i = start; i >= end + 3; i--)
-        {
-            if (ImageDeal[i].IsLeftFind == 'T' &&
-                ImageDeal[i - 1].IsLeftFind == 'T' &&
-                (ImageDeal[i + 1].IsLeftFind == 'W' || ImageDeal[i + 2].IsLeftFind == 'W') &&
-                ImageDeal[i].LeftBorder > 1 &&
-                ImageDeal[i].LeftBorder < 45 &&
-                abs(ImageDeal[i].LeftBorder - ImageDeal[i - 1].LeftBorder) <= 8)
-            {
-                Cross_Left_Up_Find = i;
-                break;
-            }
-        }
-    }
-
-    if (Cross_Right_Up_Find == 0)
-    {
-        for (i = start; i >= end + 3; i--)
-        {
-            if (ImageDeal[i].IsRightFind == 'T' &&
-                ImageDeal[i - 1].IsRightFind == 'T' &&
-                (ImageDeal[i + 1].IsRightFind == 'W' || ImageDeal[i + 2].IsRightFind == 'W') &&
-                ImageDeal[i].RightBorder > 35 &&
-                ImageDeal[i].RightBorder < 78 &&
-                abs(ImageDeal[i].RightBorder - ImageDeal[i - 1].RightBorder) <= 8)
-            {
-                Cross_Right_Up_Find = i;
-                break;
-            }
-        }
-    }
-
-    if (Cross_Left_Up_Find != 0 &&
-        Cross_Right_Up_Find != 0 &&
-        abs(Cross_Left_Up_Find - Cross_Right_Up_Find) > 18)
-    {
-        Cross_Left_Up_Find = 0;
-        Cross_Right_Up_Find = 0;
-    }
-}
-
-static void Cross_Test_Point(void)
-{
-    Cross_Left_Up_Find = 0;
-    Cross_Right_Up_Find = 0;
-
-    if (ImageStatus.Road_type == LeftCirque ||
-        ImageStatus.Road_type == RightCirque ||
-        ImageFlag.image_element_rings_flag != 0)
-        return;
-
-    if (ImageDeal[59].Center < ImageStatus.MiddleLine - 12 ||
-        ImageDeal[59].Center > ImageStatus.MiddleLine + 12)
-        return;
-
-    if (abs(ImageDeal[59].Center - ImageDeal[50].Center) > 18)
-        return;
-
-    if (ImageStatus.WhiteLine < 5)
-        return;
-
-    Cross_Find_Up_Point(54, ImageStatus.OFFLine + 5);
-
-    if (Cross_Left_Up_Find != 0 && Cross_Right_Up_Find != 0)
-    {
-        ImageStatus.Road_type = Cross_ture;
-        Cross_Lock_Flag = 1;
-        Cross_Lock_Cnt = 0;
-        printf("[CROSS] enter L=%d R=%d WL=%d\r\n", Cross_Left_Up_Find, Cross_Right_Up_Find,
-               ImageStatus.WhiteLine);
-    }
-}
-
-static void Cross_Handle(void)
-{
-    uint8 y;
-    int left;
-    int right;
-    int middle = ImageStatus.MiddleLine;
-
-    if (ImageStatus.Road_type != Cross_ture)
-        return;
-
-    if (middle <= 0 || middle >= LCDW)
-        middle = 40;
-
-    if (Cross_Lock_Cnt >= 5 && ImageStatus.WhiteLine < 3)
-    {
-        Cross_Lock_Cnt = 0;
-        Cross_Lock_Flag = 0;
-        ImageStatus.Road_type = Normol;
-        return;
-    }
-
-    ImageStatus.OFFLine = 2;
-
-    for (y = 59; y > 2; y--)
-    {
-        left = middle - Half_Road_Wide[y];
-        right = middle + Half_Road_Wide[y];
-
-        if (left < 1)
-            left = 1;
-        if (right > 78)
-            right = 78;
-
-        ImageDeal[y].LeftBorder = left;
-        ImageDeal[y].RightBorder = right;
-        ImageDeal[y].Center = middle;
-        ImageDeal[y].Wide = right - left;
-
-        ImageDeal[y].IsLeftFind = 'T';
-        ImageDeal[y].IsRightFind = 'T';
-
-        ImageDeal[y].LeftBoundary = left;
-        ImageDeal[y].RightBoundary = right;
-        ImageDeal[y].LeftBoundary_First = left;
-        ImageDeal[y].RightBoundary_First = right;
-    }
-
-    Cross_Lock_Cnt++;
-
-    if (Cross_Lock_Cnt >= CROSS_HOLD_FRAME)
-    {
-        Cross_Lock_Cnt = 0;
-        Cross_Lock_Flag = 0;
-        ImageStatus.Road_type = Normol;
-    }
-}
-
 void Element_Test(void)
 {
-    if (Cross_Lock_Flag == 1)
-    {
-        ImageStatus.Road_type = Cross_ture;
-        return;
-    }
 
-    if (ImageStatus.Road_type != RightCirque && ImageStatus.Road_type != LeftCirque)
+    if (ImageStatus.Road_type != RightCirque && ImageStatus.Road_type != LeftCirque
+        //  &&SystemData.Stop == 0
+    )
     {
         Element_Judgment_Left_Rings();  // 左环岛判断
         Element_Judgment_Right_Rings(); // 右环岛判断
-    }
-    if (ImageStatus.Road_type != RightCirque && ImageStatus.Road_type != LeftCirque &&
-        ImageStatus.Road_type != Ramp && ImageFlag.image_element_rings_flag == 0)
-    {
-        Cross_Test_Point();
     }
 }
 
 // 元素处理函数
 void Element_Handle()
 {
-    if (ImageStatus.Road_type == Cross_ture)
-    {
-        Cross_Handle();
-        return;
-    }
-
     if (ImageFlag.image_element_rings == 1)
         Element_Handle_Left_Rings();
     else if (ImageFlag.image_element_rings == 2)
