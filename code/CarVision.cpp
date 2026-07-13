@@ -3,12 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <sys/ioctl.h>
-#include <sys/mman.h>
-#include <sys/select.h>
-#include <linux/videodev2.h>
 
 #include <algorithm>
 #include <cmath>
@@ -22,20 +16,47 @@
 static const char *MODEL_PARAM = "tiny_classifier_6fp32.ncnn.param";
 static const char *MODEL_BIN = "tiny_classifier_6fp32.ncnn.bin";
 static const char *LABELS_PATH = "labels6.txt";
-static const char *CAMERA_DEV = "/dev/video0";
 
-static const int FRAME_WIDTH = 320;
-static const int FRAME_HEIGHT = 240;
 static const int MODEL_SIZE = 96;
 
 static const float CONFIDENCE_THRESH = 0.60f;
 static const int INFER_INTERVAL = 2;
-static const int MIN_RED_AREA = 25;
-static const int SELECT_TIMEOUT_MS = 10;
 
-// ===================== 内部类 =====================
+// ---- 红框检测参数（与 cai3.py 一致）----
+// HSV 红色阈值
+static const int H1_LOW = 0, S1_LOW = 62, V1_LOW = 66;
+static const int H1_HIGH = 10, S1_HIGH = 255, V1_HIGH = 255;
+static const int H2_LOW = 161, S2_LOW = 62, V2_LOW = 66;
+static const int H2_HIGH = 180, S2_HIGH = 255, V2_HIGH = 255;
+
+// 形态学核大小
+static const int MORPH_KERNEL_SIZE = 2;
+
+// 最小红色面积（像素）
+static const int MIN_RED_AREA = 60;
+
+// 长宽比限制
+static const double MIN_ASPECT_RATIO = 0.3;
+static const double MAX_ASPECT_RATIO = 5.0;
+
+// 目标红色面积占画面比例
+static const double TARGET_RED_AREA_RATIO = 0.002;
+
+// 粘连判定阈值
+static const int STICKY_AREA_MULT = 5;
+static const int STICKY_MIN_HEIGHT = 20;
+static const int EROSION_KERNEL_SIZE = 5;
+
+// ===================== 内部结构 =====================
 struct RedBox
 {
+    int x, y, w, h;
+};
+
+struct Candidate
+{
+    double area;
+    double area_ratio;
     int x, y, w, h;
 };
 
@@ -46,16 +67,14 @@ class CarVisionImpl
     ~CarVisionImpl();
 
     bool init();
-    bool update(int &category);
     bool updateFromFrame(const cv::Mat &img, int &category);
     void close();
 
   private:
     bool loadLabels();
-    bool initCamera();
-    cv::Mat captureFrame();
 
-    RedBox findLargestRedBox(const cv::Mat &frame);
+    RedBox findTargetRedBox(const cv::Mat &frame);
+    void trySplitStickyContour(const cv::Mat &mask, const cv::Rect &bbox, std::vector<Candidate> &candidates);
     bool computeRoiRect(const cv::Mat &frame, const RedBox &red_box, cv::Rect &roi_rect);
     cv::Mat cropRoi(const cv::Mat &frame, const RedBox &red_box);
 
@@ -66,21 +85,18 @@ class CarVisionImpl
     ncnn::Net net_;
     std::vector<std::string> labels_;
 
-    int fd_;
-    unsigned char *framebuf_;
-    unsigned int framebuf_length_;
-    bool camera_started_;
-
     int frame_id_;
     int last_small_id_;
     int last_big_id_;
     float last_confidence_;
+
+    uint8_t rgb565_to_r_[32];
+    uint8_t rgb565_to_g_[64];
+    uint8_t rgb565_to_b_[32];
 };
 
 // ===================== 实现 =====================
-CarVisionImpl::CarVisionImpl()
-    : fd_(-1), framebuf_(nullptr), framebuf_length_(0), camera_started_(false), frame_id_(0), last_small_id_(-1),
-      last_big_id_(-1), last_confidence_(0.0f)
+CarVisionImpl::CarVisionImpl() : frame_id_(0), last_small_id_(-1), last_big_id_(-1), last_confidence_(0.0f)
 {
 }
 
@@ -91,6 +107,16 @@ CarVisionImpl::~CarVisionImpl()
 
 bool CarVisionImpl::init()
 {
+    for (int i = 0; i < 32; i++)
+    {
+        rgb565_to_r_[i] = (uint8_t)(i * 255 / 31);
+        rgb565_to_b_[i] = (uint8_t)(i * 255 / 31);
+    }
+    for (int i = 0; i < 64; i++)
+    {
+        rgb565_to_g_[i] = (uint8_t)(i * 255 / 63);
+    }
+
     net_.opt.num_threads = 2;
     net_.opt.use_packing_layout = true;
     net_.opt.lightmode = true;
@@ -143,137 +169,6 @@ bool CarVisionImpl::loadLabels()
     return !labels_.empty();
 }
 
-bool CarVisionImpl::initCamera()
-{
-    fd_ = open(CAMERA_DEV, O_RDWR);
-    if (fd_ < 0)
-    {
-        perror("open camera");
-        return false;
-    }
-
-    struct v4l2_format fmt;
-    memset(&fmt, 0, sizeof(fmt));
-    fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    fmt.fmt.pix.width = FRAME_WIDTH;
-    fmt.fmt.pix.height = FRAME_HEIGHT;
-    fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_MJPEG;
-    fmt.fmt.pix.field = V4L2_FIELD_NONE;
-
-    if (ioctl(fd_, VIDIOC_S_FMT, &fmt) < 0)
-    {
-        perror("VIDIOC_S_FMT");
-        close();
-        return false;
-    }
-
-    struct v4l2_requestbuffers req;
-    memset(&req, 0, sizeof(req));
-    req.count = 1;
-    req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    req.memory = V4L2_MEMORY_MMAP;
-
-    if (ioctl(fd_, VIDIOC_REQBUFS, &req) < 0)
-    {
-        perror("VIDIOC_REQBUFS");
-        close();
-        return false;
-    }
-
-    struct v4l2_buffer buf;
-    memset(&buf, 0, sizeof(buf));
-    buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    buf.memory = V4L2_MEMORY_MMAP;
-    buf.index = 0;
-
-    if (ioctl(fd_, VIDIOC_QUERYBUF, &buf) < 0)
-    {
-        perror("VIDIOC_QUERYBUF");
-        close();
-        return false;
-    }
-
-    framebuf_length_ = buf.length;
-    framebuf_ = (unsigned char *)mmap(NULL, buf.length, PROT_READ | PROT_WRITE, MAP_SHARED, fd_, buf.m.offset);
-
-    if (framebuf_ == MAP_FAILED)
-    {
-        perror("mmap");
-        framebuf_ = nullptr;
-        close();
-        return false;
-    }
-
-    if (ioctl(fd_, VIDIOC_QBUF, &buf) < 0)
-    {
-        perror("VIDIOC_QBUF");
-        close();
-        return false;
-    }
-
-    enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    if (ioctl(fd_, VIDIOC_STREAMON, &type) < 0)
-    {
-        perror("VIDIOC_STREAMON");
-        close();
-        return false;
-    }
-
-    camera_started_ = true;
-    return true;
-}
-
-cv::Mat CarVisionImpl::captureFrame()
-{
-    if (fd_ < 0 || !camera_started_)
-    {
-        return cv::Mat();
-    }
-
-    fd_set fds;
-    FD_ZERO(&fds);
-    FD_SET(fd_, &fds);
-
-    struct timeval tv;
-    tv.tv_sec = SELECT_TIMEOUT_MS / 1000;
-    tv.tv_usec = (SELECT_TIMEOUT_MS % 1000) * 1000;
-
-    int ret = select(fd_ + 1, &fds, NULL, NULL, &tv);
-    if (ret <= 0)
-    {
-        return cv::Mat();
-    }
-
-    struct v4l2_buffer buf;
-    memset(&buf, 0, sizeof(buf));
-    buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    buf.memory = V4L2_MEMORY_MMAP;
-    buf.index = 0;
-
-    if (ioctl(fd_, VIDIOC_DQBUF, &buf) < 0)
-    {
-        return cv::Mat();
-    }
-
-    cv::Mat img = cv::imdecode(cv::Mat(1, buf.bytesused, CV_8UC1, framebuf_), cv::IMREAD_COLOR);
-
-    ioctl(fd_, VIDIOC_QBUF, &buf);
-    return img;
-}
-
-bool CarVisionImpl::update(int &category)
-{
-    category = -1;
-
-    cv::Mat img = captureFrame();
-    if (img.empty())
-    {
-        return false;
-    }
-
-    return updateFromFrame(img, category);
-}
-
 bool CarVisionImpl::updateFromFrame(const cv::Mat &img, int &category)
 {
     category = -1;
@@ -283,7 +178,7 @@ bool CarVisionImpl::updateFromFrame(const cv::Mat &img, int &category)
         return false;
     }
 
-    RedBox red_box = findLargestRedBox(img);
+    RedBox red_box = findTargetRedBox(img);
     bool has_red_box = (red_box.w > 0 && red_box.h > 0);
 
     if (!has_red_box)
@@ -347,45 +242,223 @@ bool CarVisionImpl::updateFromFrame(const cv::Mat &img, int &category)
     return true;
 }
 
-RedBox CarVisionImpl::findLargestRedBox(const cv::Mat &frame)
+// ===================== 粘连拆分 =====================
+void CarVisionImpl::trySplitStickyContour(const cv::Mat &mask, const cv::Rect &bbox, std::vector<Candidate> &candidates)
+{
+    if (bbox.width == 0 || bbox.height == 0 || bbox.x < 0 || bbox.y < 0 || bbox.x + bbox.width > mask.cols ||
+        bbox.y + bbox.height > mask.rows)
+    {
+        return;
+    }
+
+    cv::Mat roi_mask = mask(bbox).clone();
+
+    cv::Mat erosion_kernel =
+        cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(EROSION_KERNEL_SIZE, EROSION_KERNEL_SIZE));
+    cv::Mat roi_eroded;
+    cv::erode(roi_mask, roi_eroded, erosion_kernel);
+
+    cv::Mat open_kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(MORPH_KERNEL_SIZE, MORPH_KERNEL_SIZE));
+    cv::Mat roi_clean;
+    cv::morphologyEx(roi_eroded, roi_clean, cv::MORPH_OPEN, open_kernel);
+
+    cv::Mat labels;
+    cv::Mat stats;
+    cv::Mat centroids;
+    int num_labels = cv::connectedComponentsWithStats(roi_clean, labels, stats, centroids, 8, CV_32S);
+
+    std::vector<Candidate> sub_regions;
+
+    for (int label_id = 1; label_id < num_labels; label_id++)
+    {
+        int sw = stats.at<int>(label_id, cv::CC_STAT_WIDTH);
+        int sh = stats.at<int>(label_id, cv::CC_STAT_HEIGHT);
+        int sx = stats.at<int>(label_id, cv::CC_STAT_LEFT);
+        int sy = stats.at<int>(label_id, cv::CC_STAT_TOP);
+        int eroded_area = stats.at<int>(label_id, cv::CC_STAT_AREA);
+
+        if (eroded_area < MIN_RED_AREA || sw == 0 || sh == 0)
+        {
+            continue;
+        }
+
+        cv::Mat sub_mask = (labels == label_id);
+        sub_mask.convertTo(sub_mask, CV_8U);
+        sub_mask = sub_mask.mul(roi_mask);
+        int actual_area = cv::countNonZero(sub_mask);
+
+        int abs_x = bbox.x + sx;
+        int abs_y = bbox.y + sy;
+
+        double aspect_ratio = (sh > 0) ? (double)sw / sh : 0;
+        if (aspect_ratio < MIN_ASPECT_RATIO || aspect_ratio > MAX_ASPECT_RATIO)
+        {
+            continue;
+        }
+
+        double area_ratio = (double)actual_area / (bbox.width * bbox.height);
+        Candidate c;
+        c.area = actual_area;
+        c.area_ratio = area_ratio;
+        c.x = abs_x;
+        c.y = abs_y;
+        c.w = sw;
+        c.h = sh;
+        sub_regions.push_back(c);
+    }
+
+    if (sub_regions.size() <= 1)
+    {
+        int actual_area = cv::countNonZero(roi_mask);
+        double area_ratio = (double)actual_area / (bbox.width * bbox.height);
+        double aspect_ratio = (bbox.height > 0) ? (double)bbox.width / bbox.height : 0;
+
+        Candidate c;
+        c.area = actual_area;
+        c.area_ratio = area_ratio;
+        c.x = bbox.x;
+        c.y = bbox.y;
+        c.w = bbox.width;
+        c.h = bbox.height;
+        candidates.push_back(c);
+        return;
+    }
+
+    for (size_t i = 0; i < sub_regions.size(); i++)
+    {
+        candidates.push_back(sub_regions[i]);
+    }
+}
+
+// ===================== 红框检测（与 cai3.py 逻辑一致）=====================
+RedBox CarVisionImpl::findTargetRedBox(const cv::Mat &frame)
 {
     cv::Mat hsv, mask1, mask2, mask;
     cv::cvtColor(frame, hsv, cv::COLOR_BGR2HSV);
 
-    cv::inRange(hsv, cv::Scalar(0, 80, 90), cv::Scalar(10, 255, 255), mask1);
-    cv::inRange(hsv, cv::Scalar(170, 80, 80), cv::Scalar(180, 255, 255), mask2);
+    cv::inRange(hsv, cv::Scalar(H1_LOW, S1_LOW, V1_LOW), cv::Scalar(H1_HIGH, S1_HIGH, V1_HIGH), mask1);
+    cv::inRange(hsv, cv::Scalar(H2_LOW, S2_LOW, V2_LOW), cv::Scalar(H2_HIGH, S2_HIGH, V2_HIGH), mask2);
 
     mask = mask1 | mask2;
 
-    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
-    cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kernel);
+    int red_pixels = cv::countNonZero(mask);
+    if (red_pixels == 0)
+    {
+        RedBox r = {0, 0, 0, 0};
+        return r;
+    }
+
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(MORPH_KERNEL_SIZE, MORPH_KERNEL_SIZE));
     cv::morphologyEx(mask, mask, cv::MORPH_OPEN, kernel);
 
     std::vector<std::vector<cv::Point>> contours;
     cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
-    RedBox result = {0, 0, 0, 0};
-    double max_area = 0.0;
+    if (contours.empty())
+    {
+        RedBox r = {0, 0, 0, 0};
+        return r;
+    }
+
+    double frame_area = frame.rows * frame.cols;
+    std::vector<Candidate> candidates;
 
     for (size_t i = 0; i < contours.size(); i++)
     {
         double area = cv::contourArea(contours[i]);
+        cv::Rect bbox = cv::boundingRect(contours[i]);
+
+        if (area >= MIN_RED_AREA * STICKY_AREA_MULT && bbox.height > STICKY_MIN_HEIGHT)
+        {
+            trySplitStickyContour(mask, bbox, candidates);
+            continue;
+        }
+
         if (area < MIN_RED_AREA)
         {
             continue;
         }
 
-        if (area > max_area)
+        if (bbox.width == 0 || bbox.height == 0)
         {
-            max_area = area;
-            cv::Rect rect = cv::boundingRect(contours[i]);
-            result.x = rect.x;
-            result.y = rect.y;
-            result.w = rect.width;
-            result.h = rect.height;
+            continue;
+        }
+
+        double aspect_ratio = (double)bbox.width / bbox.height;
+        if (aspect_ratio < MIN_ASPECT_RATIO || aspect_ratio > MAX_ASPECT_RATIO)
+        {
+            continue;
+        }
+
+        double area_ratio = area / frame_area;
+
+        Candidate c;
+        c.area = area;
+        c.area_ratio = area_ratio;
+        c.x = bbox.x;
+        c.y = bbox.y;
+        c.w = bbox.width;
+        c.h = bbox.height;
+        candidates.push_back(c);
+    }
+
+    if (candidates.empty())
+    {
+        RedBox r = {0, 0, 0, 0};
+        return r;
+    }
+
+    double max_allowed_ratio = TARGET_RED_AREA_RATIO * 10.0;
+
+    Candidate best = candidates[0];
+
+    bool found_valid = false;
+    for (size_t i = 0; i < candidates.size(); i++)
+    {
+        if (candidates[i].area_ratio <= max_allowed_ratio)
+        {
+            found_valid = true;
+            break;
         }
     }
 
+    if (found_valid)
+    {
+        double best_score = -1e30;
+        for (size_t i = 0; i < candidates.size(); i++)
+        {
+            if (candidates[i].area_ratio > max_allowed_ratio)
+            {
+                continue;
+            }
+            double ar = (candidates[i].h > 0) ? (double)candidates[i].w / candidates[i].h : 0;
+            double score = ar - std::abs(candidates[i].area_ratio - TARGET_RED_AREA_RATIO) * 10.0;
+            if (score > best_score)
+            {
+                best_score = score;
+                best = candidates[i];
+            }
+        }
+    }
+    else
+    {
+        double min_diff = 1e30;
+        for (size_t i = 0; i < candidates.size(); i++)
+        {
+            double diff = std::abs(candidates[i].area_ratio - TARGET_RED_AREA_RATIO);
+            if (diff < min_diff)
+            {
+                min_diff = diff;
+                best = candidates[i];
+            }
+        }
+    }
+
+    RedBox result;
+    result.x = best.x;
+    result.y = best.y;
+    result.w = best.w;
+    result.h = best.h;
     return result;
 }
 
@@ -532,25 +605,6 @@ int CarVisionImpl::mapToBigId(const std::string &label) const
 
 void CarVisionImpl::close()
 {
-    if (fd_ >= 0 && camera_started_)
-    {
-        enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        ioctl(fd_, VIDIOC_STREAMOFF, &type);
-        camera_started_ = false;
-    }
-
-    if (framebuf_ != nullptr)
-    {
-        munmap(framebuf_, framebuf_length_);
-        framebuf_ = nullptr;
-        framebuf_length_ = 0;
-    }
-
-    if (fd_ >= 0)
-    {
-        ::close(fd_);
-        fd_ = -1;
-    }
 }
 
 // ===================== 全局接口 =====================
@@ -572,23 +626,6 @@ bool vision_init()
     }
 
     return true;
-}
-
-int vision_get()
-{
-    if (g_vision == nullptr)
-    {
-        return -1;
-    }
-
-    int category = -1;
-
-    if (g_vision->update(category))
-    {
-        return category;
-    }
-
-    return -1;
 }
 
 int vision_get_from_rgb565(const uint16_t *rgb565, int width, int height)
@@ -619,7 +656,6 @@ int vision_get_from_rgb565(const uint16_t *rgb565, int width, int height)
 
     return -1;
 }
-
 void vision_close()
 {
     if (g_vision != nullptr)

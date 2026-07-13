@@ -300,17 +300,21 @@ int main()
         }
 
         // ========== IPS200屏幕显示 ==========
-        static uint16 screen_buf[120][160]; // IPS200显存缓冲区（RGB565格式，逐飞派原版尺寸）
+        static const int SCREEN_W = 160;
+        static const int SCREEN_H = 120;
+        static uint16 screen_buf[SCREEN_H][SCREEN_W]; // IPS200 display buffer
         memset(screen_buf, 0, sizeof(screen_buf));
 
         if (rgb_image != nullptr)
         {
-            // 步骤1: 直接复制RGB图像到screen_buf（逐飞派原版：不放大）
-            for (int y = 0; y < UVC_HEIGHT; y++) // 120行
+            // Map UVC frame into fixed 160x120 buffer; safe for 160x120 or 320x240 camera input.
+            for (int y = 0; y < SCREEN_H; y++)
             {
-                for (int x = 0; x < UVC_WIDTH; x++) // 160列
+                int src_y = y * UVC_HEIGHT / SCREEN_H;
+                for (int x = 0; x < SCREEN_W; x++)
                 {
-                    screen_buf[y][x] = rgb_image[y * UVC_WIDTH + x];
+                    int src_x = x * UVC_WIDTH / SCREEN_W;
+                    screen_buf[y][x] = rgb_image[src_y * UVC_WIDTH + src_x];
                 }
             }
 
@@ -323,7 +327,7 @@ int main()
             draw_towpoint_lines_on_screen(screen_buf); // 🟢前瞻点范围青色横线
 
             // 步骤3: 刷新整个IPS200屏幕（居中显示160×120）
-            ips200.show_rgb565_image(80, 60, screen_buf[0], 160, 120, 160, 120, 0);
+            ips200.show_rgb565_image(80, 60, screen_buf[0], SCREEN_W, SCREEN_H, SCREEN_W, SCREEN_H, 0);
             Menu_Draw();
         }
 

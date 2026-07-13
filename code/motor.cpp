@@ -60,7 +60,7 @@ int speed_pwm_min_l = 750;
 int speed_pwm_min_r = 725;
 float speed_pwm_feedforward_l = 10.6f;
 float speed_pwm_feedforward_r = 10.3f;
-static int line_base_speed = 180;
+static int line_base_speed = 155;
 
 static void reset_speed_pid_state()
 {
@@ -675,32 +675,34 @@ void motor_diff_pid1()
     float current_kd = 0.20f;
     if (abs_turn_error <= 3.5f)
     {
-        current_kp = diff_kp * 0.7f;
-        current_kd = 0.12f;
+        current_kp = diff_kp * 0.65f;
+        current_kd = 0.10f;
     }
     else if (abs_turn_error >= 8.0f)
     {
-        current_kp = 9.0f; // stronger bend turn
-        current_kd = 0.30f;
+        current_kp = 14.0f; // stronger bend turn
+        current_kd = 0.36f;
     }
     else
     {
-        current_kp = 5.0f;
-        current_kd = 0.22f;
+        current_kp = 8.5f;
+        current_kd = 0.26f;
     }
 
     // 转向 PD 控制
 
     float turn_output = current_kp * turn_error + current_kd * (turn_error - last_turn_error);
-    bool ring_turning = (ImageFlag.image_element_rings_flag >= 5 &&
-                         ImageFlag.image_element_rings_flag <= 8);
+    bool ring_turning = (ImageStatus.Road_type == LeftCirque ||
+                         ImageStatus.Road_type == RightCirque ||
+                         (ImageFlag.image_element_rings_flag >= 3 &&
+                          ImageFlag.image_element_rings_flag <= 8));
     if (ring_turning)
-        turn_output *= 1.30f;
+        turn_output *= 1.95f;
     bool turn_cross_zero = (turn_error * last_turn_error) < 0.0f;
     last_turn_error = turn_error;
 
-    // 转向限幅：允许急弯接近外侧正转、内侧反转，但避免D项尖峰过猛
-    float turn_limit = 520.0f;
+    // 转向限幅：环岛内允许更大的左右轮差速。
+    float turn_limit = ring_turning ? 820.0f : 760.0f;
     if (turn_output > turn_limit)
         turn_output = turn_limit;
     if (turn_output < -turn_limit)
@@ -712,33 +714,33 @@ void motor_diff_pid1()
         filtered_turn_output = 0.0f;
     }
 
-    float max_turn_step = (abs_turn_error >= 8.0f) ? 220.0f : 70.0f;
+    float max_turn_step = (abs_turn_error >= 8.0f) ? 320.0f : 160.0f;
     float turn_delta = turn_output - filtered_turn_output;
     if (turn_delta > max_turn_step)
         turn_delta = max_turn_step;
     if (turn_delta < -max_turn_step)
         turn_delta = -max_turn_step;
     filtered_turn_output += turn_delta;
-    filtered_turn_output = 0.65f * filtered_turn_output + 0.35f * turn_output;
+    filtered_turn_output = 0.45f * filtered_turn_output + 0.55f * turn_output;
     if (abs_turn_error <= 3.0f)
     {
-        filtered_turn_output *= 0.25f;
+        filtered_turn_output *= 0.70f;
     }
 
     int current_base_speed = line_base_speed;
     bool ring_detected = (ImageStatus.Road_type == LeftCirque ||
                           ImageStatus.Road_type == RightCirque ||
                           ImageFlag.image_element_rings_flag != 0);
-    if (ring_detected && current_base_speed > 180)
-        current_base_speed = 180;
-    if (abs_turn_error > 3.0f)
-        current_base_speed -= (int)((abs_turn_error - 3.0f) * 9.0f);
-    if (abs_turn_error >= 12.0f && current_base_speed > 60)
-        current_base_speed = 60;
-    else if (abs_turn_error >= 8.0f && current_base_speed > 90)
-        current_base_speed = 90;
-    else if (abs_turn_error >= 4.5f && current_base_speed > 140)
-        current_base_speed = 140;
+    if (ring_detected && current_base_speed > 155)
+        current_base_speed = 155;
+    if (abs_turn_error > 2.0f)
+        current_base_speed -= (int)((abs_turn_error - 2.0f) * 15.0f);
+    if (abs_turn_error >= 12.0f && current_base_speed > 55)
+        current_base_speed = 55;
+    else if (abs_turn_error >= 8.0f && current_base_speed > 80)
+        current_base_speed = 80;
+    else if (abs_turn_error >= 4.0f && current_base_speed > 110)
+        current_base_speed = 110;
     if (current_base_speed < 45)
         current_base_speed = 45;
 
@@ -746,14 +748,15 @@ void motor_diff_pid1()
     diff_speedl_expect = current_base_speed + (int)filtered_turn_output;
     diff_speedr_expect = current_base_speed - (int)filtered_turn_output;
 
-    // 极限保护（慢速模式）
-    if (diff_speedl_expect < -260)
-        diff_speedl_expect = -260;
-    if (diff_speedr_expect < -260)
-        diff_speedr_expect = -260;
+    // 极限保护：环岛内放大轮速范围，允许更大的内外轮差。
+    int wheel_limit = ring_turning ? 420 : 380;
+    if (diff_speedl_expect < -wheel_limit)
+        diff_speedl_expect = -wheel_limit;
+    if (diff_speedr_expect < -wheel_limit)
+        diff_speedr_expect = -wheel_limit;
 
-    if (diff_speedl_expect > 260)
-        diff_speedl_expect = 260;
-    if (diff_speedr_expect > 260)
-        diff_speedr_expect = 260;
+    if (diff_speedl_expect > wheel_limit)
+        diff_speedl_expect = wheel_limit;
+    if (diff_speedr_expect > wheel_limit)
+        diff_speedr_expect = wheel_limit;
 }
