@@ -2062,7 +2062,7 @@ static void CrossStraightHold(void)
     {
         cross_latched = true;
         cross_release_frames = 0;
-        cross_hold_frames = 6;
+        cross_hold_frames = 3;
         ImageStatus.Road_type = Cross_ture;
         printf("[CROSS] hold L=%d R=%d WL=%d OFF=%d BC=%d BV=%d\r\n",
                ImageStatus.Left_Line,
