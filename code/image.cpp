@@ -35,9 +35,7 @@ int Repair_Point_Xsite, Repair_Point_Ysite;                                     
 uint8_t *binar;                                                                     // 灰度图像数组指针
 ROIRegionTypedef LargestWhiteRegion;
 
-
 static int Left_Ring_Exit_Hold_Frames = 0;
-
 
 static int Left_Ring_Outward_Center(int left, int right)
 {
@@ -69,10 +67,7 @@ static bool Left_Ring_Exit_Image_Ready(void)
             lower_both_found++;
     }
 
-    return (ImageStatus.OFFLine <= 8 &&
-            lower_both_found >= 4 &&
-            lower_right_found >= 10 &&
-            valid_width_rows >= 10);
+    return (ImageStatus.OFFLine <= 8 && lower_both_found >= 4 && lower_right_found >= 10 && valid_width_rows >= 10);
 }
 
 uint8 Half_Road_Wide[60] = // 直道半宽度
@@ -520,7 +515,8 @@ static void DrawLinesProcess(void)
         /******************************扫描本行左边界******************************/
         if (ImageStatus.Road_type != Cross_ture)
         {
-            IntervalLow = ImageDeal[Ysite + 1].LeftBorder - ImageScanInterval; // 从前一行左边界-5的点开始（确定扫描开始点）
+            IntervalLow =
+                ImageDeal[Ysite + 1].LeftBorder - ImageScanInterval; // 从前一行左边界-5的点开始（确定扫描开始点）
             IntervalHigh =
                 ImageDeal[Ysite + 1].LeftBorder + ImageScanInterval; // 从前一行左边界+5的点结束（确定扫描结束点）
         }
@@ -728,14 +724,9 @@ static void DrawLinesProcess(void)
         else if ((ImageDeal[Ysite].RightBorder <= 10 && ImageDeal[Ysite].IsLeftFind == 'W') ||
                  (ImageDeal[Ysite].LeftBorder >= 70 && ImageDeal[Ysite].IsRightFind == 'W'))
         {
-            printf("[LINELOST] edge stop y=%d L=%d R=%d LF=%c RF=%c W=%d OFF=%d\r\n",
-                   Ysite,
-                   ImageDeal[Ysite].LeftBorder,
-                   ImageDeal[Ysite].RightBorder,
-                   ImageDeal[Ysite].IsLeftFind,
-                   ImageDeal[Ysite].IsRightFind,
-                   ImageDeal[Ysite].Wide,
-                   ImageStatus.OFFLine);
+            printf("[LINELOST] edge stop y=%d L=%d R=%d LF=%c RF=%c W=%d OFF=%d\r\n", Ysite,
+                   ImageDeal[Ysite].LeftBorder, ImageDeal[Ysite].RightBorder, ImageDeal[Ysite].IsLeftFind,
+                   ImageDeal[Ysite].IsRightFind, ImageDeal[Ysite].Wide, ImageStatus.OFFLine);
             ImageStatus.OFFLine = Ysite + 1; // 当图像左边小于10或者右边达到一定值时停止巡线
             break;
         }
@@ -749,8 +740,7 @@ static void DrawExtensionLine(void) // 处理延长线部分，确保边界连�
 {
     /***************************************************延长右边界 ***********************************************/
     if ((ImageStatus.Road_type != Barn_in && ImageStatus.Road_type != Ramp) /*&&ImageStatus.pansancha_Lenth* OX==0*/ &&
-        ImageStatus.Road_type != Cross_ture &&
-        ImageStatus.Road_type != LeftCirque &&
+        ImageStatus.Road_type != Cross_ture && ImageStatus.Road_type != LeftCirque &&
         ImageStatus.Road_type != RightCirque) // g5.22  6.22注意注释  ǵĻ���//过三叉元素时
     {
 
@@ -1160,7 +1150,7 @@ void Element_Judgment_Left_Rings()
     //        ImageStatus.WhiteLine, (ImageStatus.WhiteLine <= 5) ? "是" : "否", ImageDeal[55].IsLeftFind,
     //        ImageDeal[56].IsLeftFind, ImageDeal[57].IsLeftFind, ImageDeal[58].IsLeftFind);
     // //    Disf = 0;
-    if (ImageStatus.Right_Line > 2 || ImageStatus.Left_Line < 20 // 13
+    if (ImageStatus.Right_Line > 2 || ImageStatus.Left_Line < 13 // 13
         || ImageStatus.OFFLine >= 10
         //  ||variance_acc>20
         // || Straight_Judge(2, 25, 45) > 1
@@ -1371,7 +1361,7 @@ void Element_Handle_Left_Rings()
         // wireless_uart_send_byte(8);
     }
     // 出环 环岛顶点判断
-    if (ImageFlag.ring_big_small == 1 && ImageFlag.image_element_rings_flag == 7&& ImageStatus.Right_Line >= 5)
+    if (ImageFlag.ring_big_small == 1 && ImageFlag.image_element_rings_flag == 7 && ImageStatus.Right_Line >= 5)
     {
         printf("状态8开始扫线");
         Point_Ysite = 0;
@@ -1397,12 +1387,8 @@ void Element_Handle_Left_Rings()
                 Point_Xsite = 1;
         }
 
-        printf("[RING][L][S7] Right_Line=%d OFF=%d point=(%d,%d) min_rx=%d\r\n",
-               ImageStatus.Right_Line,
-               ImageStatus.OFFLine,
-               Point_Xsite,
-               Point_Ysite,
-               min_right_x);
+        printf("[RING][L][S7] Right_Line=%d OFF=%d point=(%d,%d) min_rx=%d\r\n", ImageStatus.Right_Line,
+               ImageStatus.OFFLine, Point_Xsite, Point_Ysite, min_right_x);
 
         // 找到右侧出口角点后进入 Apex式出环补线阶段。
         if (Point_Ysite > ImageStatus.OFFLine + 5)
@@ -1454,7 +1440,7 @@ void Element_Handle_Left_Rings()
             if (ImageDeal[Ysite].IsLeftFind == 'W')
                 num++;
         }
-        if (Left_Ring_Exit_Hold_Frames >= 8 && num < 5)
+        if (Left_Ring_Exit_Hold_Frames >= 4 && num < 5)
         {
             printf("环岛结束，进入正常道路\r\n");
             ImageStatus.Road_type = Normol; // 返回正常的道路类型 0
@@ -1475,7 +1461,7 @@ void Element_Handle_Left_Rings()
     {
         for (int Ysite = 57; Ysite > ImageStatus.OFFLine; Ysite--)
         {
-            ImageDeal[Ysite].Center = ((ImageDeal[Ysite].RightBorder + ImageDeal[Ysite].LeftBorder) / 2)-5;
+            ImageDeal[Ysite].Center = ((ImageDeal[Ysite].RightBorder + ImageDeal[Ysite].LeftBorder) / 2) + 2;
         }
     }
     // 状态5/6保持入环补线；状态7开始使用开源版本的出口补线。
@@ -1651,8 +1637,7 @@ void Element_Handle_Left_Rings()
         for (int y = 50; y > ImageStatus.OFFLine + 3; y--)
         {
             int x = ImageDeal[y].LeftBorder;
-            if (x - ImageDeal[y + 2].LeftBorder >= 3 &&
-                x - ImageDeal[y - 2].LeftBorder >= 3)
+            if (x - ImageDeal[y + 2].LeftBorder >= 3 && x - ImageDeal[y - 2].LeftBorder >= 3)
             {
                 anchor_y = y;
                 anchor_x = x;
@@ -1942,8 +1927,7 @@ void Element_Handle()
 // 丢双线的时候 处理无边行的补线
 static bool IsRingRoadActive(void)
 {
-    return ImageStatus.Road_type == LeftCirque ||
-           ImageStatus.Road_type == RightCirque ||
+    return ImageStatus.Road_type == LeftCirque || ImageStatus.Road_type == RightCirque ||
            ImageFlag.image_element_rings_flag != 0;
 }
 
@@ -2010,8 +1994,12 @@ static void CrossBorderRepair(void)
     static int cross_hold_frames = 0;
     static int cross_release_frames = 0;
     static bool cross_latched = false;
+    static bool cross_from_top = false;
     static int cross_bottom_left = 0;
     static int cross_bottom_right = LCDW - 1;
+    static int cross_top_left = 0;
+    static int cross_top_right = LCDW - 1;
+    static int cross_top_y = 36;
 
     bool ring_active = (ImageStatus.Road_type == LeftCirque ||
                         ImageStatus.Road_type == RightCirque ||
@@ -2033,35 +2021,84 @@ static void CrossBorderRepair(void)
         }
     }
 
+    int top_left_sum = 0;
+    int top_right_sum = 0;
+    int top_center_sum = 0;
+    int top_y_sum = 0;
+    int top_valid_rows = 0;
+    int top_scan_start = ImageStatus.OFFLine + 3;
+    if (top_scan_start < 8)
+        top_scan_start = 8;
+    if (top_scan_start > 40)
+        top_scan_start = 40;
+
+    for (int y = top_scan_start; y <= 45; y++)
+    {
+        if (ImageDeal[y].IsLeftFind == 'T' && ImageDeal[y].IsRightFind == 'T' &&
+            ImageDeal[y].Wide >= 20 && ImageDeal[y].Wide <= 72 &&
+            ImageDeal[y].Center >= 25 && ImageDeal[y].Center <= 55)
+        {
+            top_left_sum += ImageDeal[y].LeftBorder;
+            top_right_sum += ImageDeal[y].RightBorder;
+            top_center_sum += ImageDeal[y].Center;
+            top_y_sum += y;
+            top_valid_rows++;
+        }
+    }
+
     int bottom_center = (bottom_valid_rows > 0) ? (bottom_center_sum / bottom_valid_rows) : 40;
+    int top_center = (top_valid_rows > 0) ? (top_center_sum / top_valid_rows) : 40;
     bool bottom_stable = (bottom_valid_rows >= 4 && bottom_center >= 34 && bottom_center <= 46);
+    bool top_stable = (top_valid_rows >= 4 && top_center >= 30 && top_center <= 50);
 
-    bool cross_like = (!ring_active &&
-                       bottom_stable &&
-                       ImageStatus.OFFLine <= 15 &&
-                       ImageStatus.WhiteLine >= 18 &&
-                       ImageStatus.Left_Line >= 12 &&
-                       ImageStatus.Right_Line >= 12);
+    bool cross_like_bottom = (!ring_active && bottom_stable && ImageStatus.OFFLine <= 15 && ImageStatus.WhiteLine >= 18 &&
+                              ImageStatus.Left_Line >= 12 && ImageStatus.Right_Line >= 12);
+    bool cross_like_top = (!ring_active && !bottom_stable && top_stable && ImageStatus.OFFLine <= 20 &&
+                           ImageStatus.WhiteLine >= 18 && ImageStatus.Left_Line >= 12 && ImageStatus.Right_Line >= 12);
 
-    if (cross_like && !cross_latched)
+    if ((cross_like_bottom || cross_like_top) && !cross_latched)
     {
         cross_latched = true;
         cross_release_frames = 0;
         cross_hold_frames = 3;
-        cross_bottom_left = bottom_left_sum / bottom_valid_rows;
-        cross_bottom_right = bottom_right_sum / bottom_valid_rows;
+        cross_from_top = cross_like_top;
         ImageStatus.Road_type = Cross_ture;
-        printf("[CROSS] repair L=%d R=%d WL=%d OFF=%d BL=%d BR=%d BC=%d BV=%d\r\n",
-               ImageStatus.Left_Line,
-               ImageStatus.Right_Line,
-               ImageStatus.WhiteLine,
-               ImageStatus.OFFLine,
-               cross_bottom_left,
-               cross_bottom_right,
-               bottom_center,
-               bottom_valid_rows);
+
+        if (cross_like_top)
+        {
+            cross_top_left = top_left_sum / top_valid_rows;
+            cross_top_right = top_right_sum / top_valid_rows;
+            cross_top_y = top_y_sum / top_valid_rows;
+            if (cross_top_y < top_scan_start)
+                cross_top_y = top_scan_start;
+            if (cross_top_y > 45)
+                cross_top_y = 45;
+            printf("[CROSS] top_repair L=%d R=%d WL=%d OFF=%d TL=%d TR=%d TC=%d TV=%d\r\n",
+                   ImageStatus.Left_Line,
+                   ImageStatus.Right_Line,
+                   ImageStatus.WhiteLine,
+                   ImageStatus.OFFLine,
+                   cross_top_left,
+                   cross_top_right,
+                   top_center,
+                   top_valid_rows);
+        }
+        else
+        {
+            cross_bottom_left = bottom_left_sum / bottom_valid_rows;
+            cross_bottom_right = bottom_right_sum / bottom_valid_rows;
+            printf("[CROSS] repair L=%d R=%d WL=%d OFF=%d BL=%d BR=%d BC=%d BV=%d\r\n",
+                   ImageStatus.Left_Line,
+                   ImageStatus.Right_Line,
+                   ImageStatus.WhiteLine,
+                   ImageStatus.OFFLine,
+                   cross_bottom_left,
+                   cross_bottom_right,
+                   bottom_center,
+                   bottom_valid_rows);
+        }
     }
-    else if (!cross_like)
+    else if (!cross_like_bottom && !cross_like_top)
     {
         if (cross_release_frames < 8)
             cross_release_frames++;
@@ -2078,34 +2115,53 @@ static void CrossBorderRepair(void)
         ImageStatus.Road_type = Cross_ture;
         cross_hold_frames--;
 
-        int top_y = ImageStatus.OFFLine + 2;
-        if (top_y < 32)
-            top_y = 32;
-        if (top_y > 42)
-            top_y = 42;
-
-        int left_top = cross_bottom_left - 12;
-        int right_top = cross_bottom_right + 12;
-        left_top = CrossClampInt(left_top, 2, cross_bottom_left);
-        right_top = CrossClampInt(right_top, cross_bottom_right, LCDW - 3);
-        for (int y = 58; y >= top_y; y--)
+        if (cross_from_top)
         {
-            int left = InterpInt(cross_bottom_left, 58, left_top, top_y, y);
-            int right = InterpInt(cross_bottom_right, 58, right_top, top_y, y);
-            left = CrossClampInt(left, 1, LCDW - 4);
-            right = CrossClampInt(right, left + 8, LCDW - 2);
+            int left = CrossClampInt(cross_top_left, 1, LCDW - 12);
+            int right = CrossClampInt(cross_top_right, left + 20, LCDW - 2);
+            int top_y = CrossClampInt(cross_top_y, ImageStatus.OFFLine + 3, 45);
+            for (int y = 58; y >= top_y; y--)
+            {
+                ImageDeal[y].LeftBorder = left;
+                ImageDeal[y].RightBorder = right;
+                ImageDeal[y].Wide = right - left;
+                ImageDeal[y].Center = (left + right) / 2;
+                ImageDeal[y].IsLeftFind = 'T';
+                ImageDeal[y].IsRightFind = 'T';
+            }
+        }
+        else
+        {
+            int top_y = ImageStatus.OFFLine + 2;
+            if (top_y < 32)
+                top_y = 32;
+            if (top_y > 42)
+                top_y = 42;
 
-            ImageDeal[y].LeftBorder = left;
-            ImageDeal[y].RightBorder = right;
-            ImageDeal[y].Wide = right - left;
-            ImageDeal[y].Center = (left + right) / 2;
-            ImageDeal[y].IsLeftFind = 'T';
-            ImageDeal[y].IsRightFind = 'T';
+            int left_top = cross_bottom_left - 12;
+            int right_top = cross_bottom_right + 12;
+            left_top = CrossClampInt(left_top, 2, cross_bottom_left);
+            right_top = CrossClampInt(right_top, cross_bottom_right, LCDW - 3);
+            for (int y = 58; y >= top_y; y--)
+            {
+                int left = InterpInt(cross_bottom_left, 58, left_top, top_y, y);
+                int right = InterpInt(cross_bottom_right, 58, right_top, top_y, y);
+                left = CrossClampInt(left, 1, LCDW - 4);
+                right = CrossClampInt(right, left + 8, LCDW - 2);
+
+                ImageDeal[y].LeftBorder = left;
+                ImageDeal[y].RightBorder = right;
+                ImageDeal[y].Wide = right - left;
+                ImageDeal[y].Center = (left + right) / 2;
+                ImageDeal[y].IsLeftFind = 'T';
+                ImageDeal[y].IsRightFind = 'T';
+            }
         }
     }
     else if (ImageStatus.Road_type == Cross_ture)
     {
         ImageStatus.Road_type = Normol;
+        cross_from_top = false;
     }
 }
 
