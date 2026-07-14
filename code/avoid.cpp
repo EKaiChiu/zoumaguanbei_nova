@@ -1,7 +1,6 @@
 #include "avoid.hpp"
 
 #include "image.hpp"
-#include "Tof.hpp"
 
 #include <math.h>
 #include <stdint.h>
@@ -174,9 +173,6 @@ void avoid_update_control(void)
 
                 avoid_state = AVOID_SHIFT;
                 printed_state = -100;
-                printf("[AVOID] start tof raw=%d filtered=%d fresh=%d vision=%d\r\n",
-                       tof_get_raw_mm(), tof_get_filtered_mm(), tof_has_fresh_data(150) ? 1 : 0,
-                       latest_vision_result);
             }
             break;
 
