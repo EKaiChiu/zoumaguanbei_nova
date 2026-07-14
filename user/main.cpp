@@ -264,8 +264,8 @@ int main()
         if (first_frame)
         {
             first_frame = 0;
-            start_motor_timer(); // 允许定时器中断执行motor_control()
-            printf("[SYSTEM] First frame OK, motor control ENABLED!\r\n");
+            start_motor_timer(); // 只标记图像就绪，是否发车由 car_start_flag 控制
+            printf("[SYSTEM] First frame OK, wait launch flag.\r\n");
         }
 
 #ifdef DEBUG_PRINT
@@ -294,6 +294,7 @@ int main()
                 }
                 else
                 {
+                    avoid_set_vision_result(-1);
                     vision_beep_latched = false;
                 }
             }
@@ -302,16 +303,16 @@ int main()
         // ========== IPS200屏幕显示 ==========
         static const int SCREEN_W = 160;
         static const int SCREEN_H = 120;
-        static uint16 screen_buf[SCREEN_H][SCREEN_W]; // IPS200 display buffer
+        static uint16 screen_buf[SCREEN_H][SCREEN_W]; // IPS200显存缓冲区（RGB565格式，逐飞派原版尺寸）
         memset(screen_buf, 0, sizeof(screen_buf));
 
         if (rgb_image != nullptr)
         {
-            // Map UVC frame into fixed 160x120 buffer; safe for 160x120 or 320x240 camera input.
-            for (int y = 0; y < SCREEN_H; y++)
+            // 步骤1: 直接复制RGB图像到screen_buf（逐飞派原版：不放大）
+            for (int y = 0; y < SCREEN_H; y++) // 120行
             {
                 int src_y = y * UVC_HEIGHT / SCREEN_H;
-                for (int x = 0; x < SCREEN_W; x++)
+                for (int x = 0; x < SCREEN_W; x++) // 160列
                 {
                     int src_x = x * UVC_WIDTH / SCREEN_W;
                     screen_buf[y][x] = rgb_image[src_y * UVC_WIDTH + src_x];
@@ -367,6 +368,7 @@ void sigint_handler(int signum)
 void cleanup()
 {
     pit_timer.stop();
+    avoid_timer.stop();
     vision_close();
     printf("程序退出，执行清理操作\r\n");
     motor1_pwm_1.set_duty(0); // ⚠️ 使用 t3 的变量名！

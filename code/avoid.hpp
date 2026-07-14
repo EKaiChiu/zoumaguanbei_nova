@@ -15,6 +15,15 @@ bool avoid_is_enabled(void);
 void avoid_set_vision_result(int result);
 void avoid_force_start(void);
 
+/* 绕行专用周期任务。由独立 PIT 中断调用，负责推进绕行状态机。 */
+void avoid_update_control(void);
+
+/* 电机层读取：true 表示绕行正在接管左右轮目标速度。 */
+bool avoid_is_controlling(void);
+
+/* 当前绕行目标中线偏移量。Nova 图像中心是 40，实际目标为 40 + Trans_line。 */
+float avoid_get_trans_line(void);
+
 /* 绕行状态机主函数（左绕行）。true 表示接管电机，false 表示继续普通巡线。 */
 bool avoid_control_left(void);
 

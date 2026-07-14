@@ -16,7 +16,7 @@ typedef enum
 } MenuPage;
 
 static MenuPage menu_page = MENU_PAGE_MODE;
-static int selected_mode = 3;
+static int selected_mode = 0;
 
 static int clamp_int(int value, int min_value, int max_value)
 {
@@ -58,6 +58,8 @@ void Menu_Process(void)
             test_mode = selected_mode;
             if (test_mode == 2)
                 menu_page = MENU_PAGE_MODE2_PWM;
+            printf("[MENU] KEY4 start, mode=%d\r\n", test_mode);
+            start_car();
         }
     }
     else if (menu_page == MENU_PAGE_MODE2_PWM)
@@ -78,6 +80,8 @@ void Menu_Process(void)
         else if (key == KEY_4)
         {
             test_mode = 2;
+            printf("[MENU] KEY4 start, mode=%d\r\n", test_mode);
+            start_car();
         }
     }
 }
