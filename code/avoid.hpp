@@ -2,7 +2,7 @@
 #define AVOID_HPP
 
 // 绕行总开关：0=只鸣笛不绕行，1=启用绕行状态机。
-#define AVOID_MODE 0
+#define AVOID_MODE 1
 
 /* 绕行状态机初始化。当前默认关闭绕行功能，只在启用后通过 Trans_line 挪动目标中线。 */
 void avoid_init(void);

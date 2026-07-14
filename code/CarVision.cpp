@@ -19,14 +19,14 @@ static const char *LABELS_PATH = "labels6.txt";
 
 static const int MODEL_SIZE = 96;
 
-static const float CONFIDENCE_THRESH = 0.60f;
+static const float CONFIDENCE_THRESH = 0.50f;
 static const int INFER_INTERVAL = 2;
 
 // ---- 红框检测参数（与 cai3.py 一致）----
 // HSV 红色阈值
-static const int H1_LOW = 0, S1_LOW = 61, V1_LOW = 120;
-static const int H1_HIGH = 180, S1_HIGH = 255, V1_HIGH = 255;
-static const int H2_LOW = 0, S2_LOW = 61, V2_LOW = 120;
+static const int H1_LOW = 0, S1_LOW = 168, V1_LOW = 123;
+static const int H1_HIGH = 10, S1_HIGH = 255, V1_HIGH = 255;
+static const int H2_LOW = 161, S2_LOW = 62, V2_LOW = 66;
 static const int H2_HIGH = 180, S2_HIGH = 255, V2_HIGH = 255;
 
 // 形态学核大小

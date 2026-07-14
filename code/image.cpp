@@ -757,9 +757,9 @@ static void DrawLinesProcess(void)
         else if ((ImageDeal[Ysite].RightBorder <= 10 && ImageDeal[Ysite].IsLeftFind == 'W') ||
                  (ImageDeal[Ysite].LeftBorder >= 70 && ImageDeal[Ysite].IsRightFind == 'W'))
         {
-            printf("[LINELOST] edge stop y=%d L=%d R=%d LF=%c RF=%c W=%d OFF=%d\r\n", Ysite,
-                   ImageDeal[Ysite].LeftBorder, ImageDeal[Ysite].RightBorder, ImageDeal[Ysite].IsLeftFind,
-                   ImageDeal[Ysite].IsRightFind, ImageDeal[Ysite].Wide, ImageStatus.OFFLine);
+            // printf("[LINELOST] edge stop y=%d L=%d R=%d LF=%c RF=%c W=%d OFF=%d\r\n", Ysite,
+            //        ImageDeal[Ysite].LeftBorder, ImageDeal[Ysite].RightBorder, ImageDeal[Ysite].IsLeftFind,
+            //        ImageDeal[Ysite].IsRightFind, ImageDeal[Ysite].Wide, ImageStatus.OFFLine);
             ImageStatus.OFFLine = Ysite + 1; // 当图像左边小于10或者右边达到一定值时停止巡线
             break;
         }
@@ -1764,8 +1764,8 @@ void Element_Handle_Right_Rings()
                 Point_Xsite = LCDW - 2;
         }
 
-        printf("[RING][R][S7] Left_Line=%d OFF=%d point=(%d,%d) max_lx=%d\r\n",
-               ImageStatus.Left_Line, ImageStatus.OFFLine, Point_Xsite, Point_Ysite, max_left_x);
+        printf("[RING][R][S7] Left_Line=%d OFF=%d point=(%d,%d) max_lx=%d\r\n", ImageStatus.Left_Line,
+               ImageStatus.OFFLine, Point_Xsite, Point_Ysite, max_left_x);
 
         if (Point_Ysite > ImageStatus.OFFLine + 5)
         {
@@ -1991,8 +1991,8 @@ void Element_Test(void)
         //  &&SystemData.Stop == 0
     )
     {
-        Element_Judgment_Left_Rings();  // 左环岛判断
-        Element_Judgment_Right_Rings(); // 右环岛判断
+         Element_Judgment_Left_Rings();  // 左环岛判断
+        // Element_Judgment_Right_Rings(); // 右环岛判断
     }
 }
 
@@ -2082,8 +2082,7 @@ static void CrossBorderRepair(void)
     static int cross_top_right = LCDW - 1;
     static int cross_top_y = 36;
 
-    bool ring_active = (ImageStatus.Road_type == LeftCirque ||
-                        ImageStatus.Road_type == RightCirque ||
+    bool ring_active = (ImageStatus.Road_type == LeftCirque || ImageStatus.Road_type == RightCirque ||
                         ImageFlag.image_element_rings_flag != 0);
 
     int bottom_left_sum = 0;
@@ -2092,8 +2091,8 @@ static void CrossBorderRepair(void)
     int bottom_valid_rows = 0;
     for (int y = 52; y <= 58; y++)
     {
-        if (ImageDeal[y].IsLeftFind == 'T' && ImageDeal[y].IsRightFind == 'T' &&
-            ImageDeal[y].Wide >= 20 && ImageDeal[y].Wide <= 72)
+        if (ImageDeal[y].IsLeftFind == 'T' && ImageDeal[y].IsRightFind == 'T' && ImageDeal[y].Wide >= 20 &&
+            ImageDeal[y].Wide <= 72)
         {
             bottom_left_sum += ImageDeal[y].LeftBorder;
             bottom_right_sum += ImageDeal[y].RightBorder;
@@ -2115,9 +2114,8 @@ static void CrossBorderRepair(void)
 
     for (int y = top_scan_start; y <= 45; y++)
     {
-        if (ImageDeal[y].IsLeftFind == 'T' && ImageDeal[y].IsRightFind == 'T' &&
-            ImageDeal[y].Wide >= 20 && ImageDeal[y].Wide <= 72 &&
-            ImageDeal[y].Center >= 25 && ImageDeal[y].Center <= 55)
+        if (ImageDeal[y].IsLeftFind == 'T' && ImageDeal[y].IsRightFind == 'T' && ImageDeal[y].Wide >= 20 &&
+            ImageDeal[y].Wide <= 72 && ImageDeal[y].Center >= 25 && ImageDeal[y].Center <= 55)
         {
             top_left_sum += ImageDeal[y].LeftBorder;
             top_right_sum += ImageDeal[y].RightBorder;
@@ -2132,8 +2130,9 @@ static void CrossBorderRepair(void)
     bool bottom_stable = (bottom_valid_rows >= 4 && bottom_center >= 34 && bottom_center <= 46);
     bool top_stable = (top_valid_rows >= 4 && top_center >= 30 && top_center <= 50);
 
-    bool cross_like_bottom = (!ring_active && bottom_stable && ImageStatus.OFFLine <= 15 && ImageStatus.WhiteLine >= 18 &&
-                              ImageStatus.Left_Line >= 12 && ImageStatus.Right_Line >= 12);
+    bool cross_like_bottom =
+        (!ring_active && bottom_stable && ImageStatus.OFFLine <= 15 && ImageStatus.WhiteLine >= 18 &&
+         ImageStatus.Left_Line >= 12 && ImageStatus.Right_Line >= 12);
     bool cross_like_top = (!ring_active && !bottom_stable && top_stable && ImageStatus.OFFLine <= 20 &&
                            ImageStatus.WhiteLine >= 18 && ImageStatus.Left_Line >= 12 && ImageStatus.Right_Line >= 12);
 
@@ -2154,29 +2153,17 @@ static void CrossBorderRepair(void)
                 cross_top_y = top_scan_start;
             if (cross_top_y > 45)
                 cross_top_y = 45;
-            printf("[CROSS] top_repair L=%d R=%d WL=%d OFF=%d TL=%d TR=%d TC=%d TV=%d\r\n",
-                   ImageStatus.Left_Line,
-                   ImageStatus.Right_Line,
-                   ImageStatus.WhiteLine,
-                   ImageStatus.OFFLine,
-                   cross_top_left,
-                   cross_top_right,
-                   top_center,
-                   top_valid_rows);
+            printf("[CROSS] top_repair L=%d R=%d WL=%d OFF=%d TL=%d TR=%d TC=%d TV=%d\r\n", ImageStatus.Left_Line,
+                   ImageStatus.Right_Line, ImageStatus.WhiteLine, ImageStatus.OFFLine, cross_top_left, cross_top_right,
+                   top_center, top_valid_rows);
         }
         else
         {
             cross_bottom_left = bottom_left_sum / bottom_valid_rows;
             cross_bottom_right = bottom_right_sum / bottom_valid_rows;
-            printf("[CROSS] repair L=%d R=%d WL=%d OFF=%d BL=%d BR=%d BC=%d BV=%d\r\n",
-                   ImageStatus.Left_Line,
-                   ImageStatus.Right_Line,
-                   ImageStatus.WhiteLine,
-                   ImageStatus.OFFLine,
-                   cross_bottom_left,
-                   cross_bottom_right,
-                   bottom_center,
-                   bottom_valid_rows);
+            printf("[CROSS] repair L=%d R=%d WL=%d OFF=%d BL=%d BR=%d BC=%d BV=%d\r\n", ImageStatus.Left_Line,
+                   ImageStatus.Right_Line, ImageStatus.WhiteLine, ImageStatus.OFFLine, cross_bottom_left,
+                   cross_bottom_right, bottom_center, bottom_valid_rows);
         }
     }
     else if (!cross_like_bottom && !cross_like_top)

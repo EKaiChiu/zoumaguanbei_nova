@@ -60,7 +60,7 @@ int speed_pwm_min_l = 750;
 int speed_pwm_min_r = 725;
 float speed_pwm_feedforward_l = 10.6f;
 float speed_pwm_feedforward_r = 10.3f;
-static int line_base_speed = 180;
+static int line_base_speed = 160;
 
 static void reset_speed_pid_state()
 {
@@ -668,20 +668,19 @@ void motor_diff_pid1()
     }
     else if (abs_turn_error >= 8.0f)
     {
-        current_kp = 9.0f; // stronger bend turn
+        current_kp = 8.0f; // stronger bend turn
         current_kd = 0.30f;
     }
     else
     {
-        current_kp = 5.0f;
+        current_kp = 6.0f;
         current_kd = 0.22f;
     }
 
     // 转向 PD 控制
 
     float turn_output = current_kp * turn_error + current_kd * (turn_error - last_turn_error);
-    bool ring_turning = (ImageFlag.image_element_rings_flag >= 5 &&
-                         ImageFlag.image_element_rings_flag <= 8);
+    bool ring_turning = (ImageFlag.image_element_rings_flag >= 5 && ImageFlag.image_element_rings_flag <= 8);
     if (ring_turning)
         turn_output *= 1.30f;
     bool turn_cross_zero = (turn_error * last_turn_error) < 0.0f;
@@ -714,17 +713,16 @@ void motor_diff_pid1()
     }
 
     int current_base_speed = line_base_speed;
-    bool ring_detected = (ImageStatus.Road_type == LeftCirque ||
-                          ImageStatus.Road_type == RightCirque ||
+    bool ring_detected = (ImageStatus.Road_type == LeftCirque || ImageStatus.Road_type == RightCirque ||
                           ImageFlag.image_element_rings_flag != 0);
     if (ring_detected && current_base_speed > 180)
         current_base_speed = 180;
     if (abs_turn_error > 3.0f)
         current_base_speed -= (int)((abs_turn_error - 3.0f) * 9.0f);
     if (abs_turn_error >= 12.0f && current_base_speed > 60)
-        current_base_speed = 60;
+        current_base_speed = 100;
     else if (abs_turn_error >= 8.0f && current_base_speed > 90)
-        current_base_speed = 90;
+        current_base_speed = 120;
     else if (abs_turn_error >= 4.5f && current_base_speed > 140)
         current_base_speed = 140;
     if (current_base_speed < 45)
@@ -735,13 +733,13 @@ void motor_diff_pid1()
     diff_speedr_expect = current_base_speed - (int)filtered_turn_output;
 
     // 极限保护（慢速模式）
-    if (diff_speedl_expect < -350)
-        diff_speedl_expect = -350;
-    if (diff_speedr_expect < -350)
-        diff_speedr_expect = -350;
+    if (diff_speedl_expect < -400)
+        diff_speedl_expect = -400;
+    if (diff_speedr_expect < -400)
+        diff_speedr_expect = -400;
 
-    if (diff_speedl_expect > 350)
-        diff_speedl_expect = 350;
-    if (diff_speedr_expect > 350)
-        diff_speedr_expect = 350;
+    if (diff_speedl_expect > 400)
+        diff_speedl_expect = 400;
+    if (diff_speedr_expect > 400)
+        diff_speedr_expect = 400;
 }
