@@ -1996,8 +1996,24 @@ void Element_Handle()
 }
 
 // 丢双线的时候 处理无边行的补线
+static bool IsRingRoadActive(void)
+{
+    return ImageStatus.Road_type == LeftCirque ||
+           ImageStatus.Road_type == RightCirque ||
+           ImageFlag.image_element_rings_flag != 0;
+}
+
+static bool IsNormalRoadRepairAllowed(void)
+{
+    if (IsRingRoadActive() || ImageStatus.Road_type == Cross_ture || ImageStatus.Road_type == Ramp)
+        return false;
+    return ImageStatus.WhiteLine < 12;
+}
+
 static void RouteFilter(void)
 {
+    if (!IsNormalRoadRepairAllowed() && ImageStatus.Road_type != Cross_ture)
+        return;
     for (Ysite = 58; Ysite >= (ImageStatus.OFFLine + 5); Ysite--) // 从开始位置到停止位置 原58
     {
         if (ImageDeal[Ysite].IsLeftFind == 'W' && ImageDeal[Ysite].IsRightFind == 'W' && Ysite <= 45 &&
@@ -2395,7 +2411,8 @@ void ImageProcess(void)
     /***元素识别*****/
     ApplyRingSLineToMainLine();
 
-    DrawExtensionLine();
+    if (IsNormalRoadRepairAllowed() || ImageStatus.Road_type == Cross_ture)
+        DrawExtensionLine();
     RouteFilter();    // 路径滤波平滑 2us
     CrossStraightHold();
                       /***元素处理*****/
