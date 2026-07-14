@@ -247,6 +247,7 @@ int main()
 
     // ====================== 5. 主循环 ======================
     static int first_frame = 1; // 第一帧标记
+    static int latest_vision_result = -1; // 最近一次 vision_get 返回值，显示在屏幕上
 
     while (true)
     {
@@ -281,6 +282,7 @@ int main()
             {
                 vision_frame_counter = 0;
                 int vision_result = vision_get_from_rgb565(rgb_image, UVC_WIDTH, UVC_HEIGHT);
+                latest_vision_result = vision_result;
                 static bool vision_beep_latched = false;
                 if (vision_result >= 0 && vision_result <= 2)
                 {
@@ -329,7 +331,10 @@ int main()
 
             // 步骤3: 刷新整个IPS200屏幕（居中显示160×120）
             ips200.show_rgb565_image(80, 60, screen_buf[0], SCREEN_W, SCREEN_H, SCREEN_W, SCREEN_H, 0);
-            Menu_Draw();
+
+            // 临时关闭菜单显示，改为显示最近一次视觉识别返回值。
+            ips200.show_string(0, 0, "Vision:");
+            ips200.show_int(64, 0, latest_vision_result, 2);
         }
 
         // ========== 第二部分：逐飞助手图传数据准备（每帧刷新一次）==========
