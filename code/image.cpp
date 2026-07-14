@@ -2035,21 +2035,38 @@ static void CrossStraightHold(void)
     bool ring_active = (ImageStatus.Road_type == LeftCirque ||
                         ImageStatus.Road_type == RightCirque ||
                         ImageFlag.image_element_rings_flag != 0);
+    int bottom_center_sum = 0;
+    int bottom_valid_rows = 0;
+    for (int y = 52; y <= 58; y++)
+    {
+        if (ImageDeal[y].IsLeftFind == 'T' && ImageDeal[y].IsRightFind == 'T' &&
+            ImageDeal[y].Wide >= 20 && ImageDeal[y].Wide <= 72)
+        {
+            bottom_center_sum += ImageDeal[y].Center;
+            bottom_valid_rows++;
+        }
+    }
+    int bottom_center = (bottom_valid_rows > 0) ? (bottom_center_sum / bottom_valid_rows) : 40;
+    bool bottom_stable = (bottom_valid_rows >= 4 && bottom_center >= 34 && bottom_center <= 46);
+
     bool cross_like = (!ring_active &&
-                       ImageStatus.OFFLine <= 25 &&
-                       ImageStatus.WhiteLine >= 10 &&
-                       ImageStatus.Left_Line >= 8 &&
-                       ImageStatus.Right_Line >= 8);
+                       bottom_stable &&
+                       ImageStatus.OFFLine <= 15 &&
+                       ImageStatus.WhiteLine >= 18 &&
+                       ImageStatus.Left_Line >= 12 &&
+                       ImageStatus.Right_Line >= 12);
 
     if (cross_like)
     {
         cross_hold_frames = 6;
         ImageStatus.Road_type = Cross_ture;
-        printf("[CROSS] hold L=%d R=%d WL=%d OFF=%d\r\n",
+        printf("[CROSS] hold L=%d R=%d WL=%d OFF=%d BC=%d BV=%d\r\n",
                ImageStatus.Left_Line,
                ImageStatus.Right_Line,
                ImageStatus.WhiteLine,
-               ImageStatus.OFFLine);
+               ImageStatus.OFFLine,
+               bottom_center,
+               bottom_valid_rows);
     }
 
     if (cross_hold_frames > 0)
