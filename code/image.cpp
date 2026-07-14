@@ -2043,7 +2043,7 @@ static void CrossStraightHold(void)
 
     if (cross_like)
     {
-        cross_hold_frames = 12;
+        cross_hold_frames = 6;
         ImageStatus.Road_type = Cross_ture;
         printf("[CROSS] hold L=%d R=%d WL=%d OFF=%d\r\n",
                ImageStatus.Left_Line,
