@@ -19,18 +19,14 @@ static const char *LABELS_PATH = "labels6.txt";
 
 static const int MODEL_SIZE   = 96;
 
-static const float CONFIDENCE_THRESH = 0.40f;
+static const float CONFIDENCE_THRESH = 0.60f;
 static const int INFER_INTERVAL = 2;
-
-// ---- 多帧投票参数 ----
-static const int VOTE_WINDOW_SIZE = 5;
-static const float VOTE_THRESHOLD_RATIO = 0.6f;
 
 // ---- 红框检测参数（与 cai3.py 一致）----
 // HSV 红色阈值
-static const int H1_LOW = 0,   S1_LOW = 43, V1_LOW = 46;
+static const int H1_LOW = 0,   S1_LOW = 168, V1_LOW = 123;
 static const int H1_HIGH = 10,  S1_HIGH = 255, V1_HIGH = 255;
-static const int H2_LOW = 161, S2_LOW = 43,  V2_LOW = 46;
+static const int H2_LOW = 161, S2_LOW = 62,  V2_LOW = 66;
 static const int H2_HIGH = 180, S2_HIGH = 255, V2_HIGH = 255;
 
 // 形态学核大小
@@ -39,8 +35,8 @@ static const int MORPH_KERNEL_SIZE = 2;
 // 最小红色面积（像素）
 static const int MIN_RED_AREA = 50;
 
-// 长宽比限制（宽/高，必须 > 1，即宽度大于高度）
-static const double MIN_ASPECT_RATIO = 1.0;
+// 长宽比限制
+static const double MIN_ASPECT_RATIO = 0.3;
 static const double MAX_ASPECT_RATIO = 5.0;
 
 // 目标红色面积占画面比例
@@ -98,21 +94,12 @@ private:
     uint8_t rgb565_to_r_[32];
     uint8_t rgb565_to_g_[64];
     uint8_t rgb565_to_b_[32];
-
-    int vote_buffer_[VOTE_WINDOW_SIZE];
-    int vote_pos_;
-    int vote_count_;
-
-    void pushVote(int category);
-    int getVoteResult() const;
 };
 
 // ===================== 实现 =====================
 CarVisionImpl::CarVisionImpl()
-    : frame_id_(0), last_small_id_(-1), last_big_id_(-1), last_confidence_(0.0f),
-      vote_pos_(0), vote_count_(0)
+    : frame_id_(0), last_small_id_(-1), last_big_id_(-1), last_confidence_(0.0f)
 {
-    memset(vote_buffer_, -1, sizeof(vote_buffer_));
 }
 
 CarVisionImpl::~CarVisionImpl()
@@ -623,67 +610,11 @@ int CarVisionImpl::mapToBigId(const std::string &label) const
     return -1;
 }
 
-void CarVisionImpl::pushVote(int category)
-{
-    vote_buffer_[vote_pos_] = category;
-    vote_pos_ = (vote_pos_ + 1) % VOTE_WINDOW_SIZE;
-    if (vote_count_ < VOTE_WINDOW_SIZE)
-    {
-        vote_count_++;
-    }
-}
-
-int CarVisionImpl::getVoteResult() const
-{
-    if (vote_count_ == 0)
-    {
-        return -1;
-    }
-
-    int counts[3] = {0, 0, 0};
-    int valid_count = 0;
-
-    for (int i = 0; i < vote_count_; i++)
-    {
-        int c = vote_buffer_[i];
-        if (c >= 0 && c < 3)
-        {
-            counts[c]++;
-            valid_count++;
-        }
-    }
-
-    if (valid_count == 0)
-    {
-        return -1;
-    }
-
-    int max_count = 0;
-    int result = -1;
-    for (int i = 0; i < 3; i++)
-    {
-        if (counts[i] > max_count)
-        {
-            max_count = counts[i];
-            result = i;
-        }
-    }
-
-    float ratio = (float)max_count / valid_count;
-    if (ratio >= VOTE_THRESHOLD_RATIO)
-    {
-        return result;
-    }
-
-    return -1;
-}
-
 int CarVisionImpl::updateFromRgb565(const uint16_t *rgb565, int width, int height)
 {
     if (rgb565 == nullptr || width <= 0 || height <= 0)
     {
-        pushVote(-1);
-        return getVoteResult();
+        return -1;
     }
 
     cv::Mat frame(height, width, CV_8UC3);
@@ -701,11 +632,11 @@ int CarVisionImpl::updateFromRgb565(const uint16_t *rgb565, int width, int heigh
 
     int category = -1;
     if (updateFromFrame(frame, category))
-        pushVote(category);
-    else
-        pushVote(-1);
+    {
+        return category;
+    }
 
-    return getVoteResult();
+    return -1;
 }
 
 void CarVisionImpl::close()
