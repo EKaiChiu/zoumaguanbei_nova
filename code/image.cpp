@@ -574,9 +574,17 @@ static void DrawLinesProcess(void)
         /******************************扫描本行右边界******************************/
 
         /******************************扫描本行左边界******************************/
-        IntervalLow = ImageDeal[Ysite + 1].LeftBorder - ImageScanInterval; // 从前一行左边界-5的点开始（确定扫描开始点）
-        IntervalHigh =
-            ImageDeal[Ysite + 1].LeftBorder + ImageScanInterval; // 从前一行左边界+5的点结束（确定扫描结束点）
+        if (ImageStatus.Road_type != Cross_ture)
+        {
+            IntervalLow = ImageDeal[Ysite + 1].LeftBorder - ImageScanInterval; // 从前一行左边界-5的点开始（确定扫描开始点）
+            IntervalHigh =
+                ImageDeal[Ysite + 1].LeftBorder + ImageScanInterval; // 从前一行左边界+5的点结束（确定扫描结束点）
+        }
+        else
+        {
+            IntervalLow = ImageDeal[Ysite + 1].LeftBorder - ImageScanInterval_Cross;
+            IntervalHigh = ImageDeal[Ysite + 1].LeftBorder + ImageScanInterval_Cross;
+        }
 
         LimitL(IntervalLow);  // 限制扫描区间并防溢出
         LimitH(IntervalHigh); // 限制扫描区间并防溢出
@@ -2021,6 +2029,44 @@ static void RouteFilter(void)
     }
 }
 
+static void CrossStraightHold(void)
+{
+    static int cross_hold_frames = 0;
+    bool ring_active = (ImageStatus.Road_type == LeftCirque ||
+                        ImageStatus.Road_type == RightCirque ||
+                        ImageFlag.image_element_rings_flag != 0);
+    bool cross_like = (!ring_active &&
+                       ImageStatus.OFFLine <= 25 &&
+                       ImageStatus.WhiteLine >= 10 &&
+                       ImageStatus.Left_Line >= 8 &&
+                       ImageStatus.Right_Line >= 8);
+
+    if (cross_like)
+    {
+        cross_hold_frames = 12;
+        ImageStatus.Road_type = Cross_ture;
+        printf("[CROSS] hold L=%d R=%d WL=%d OFF=%d\r\n",
+               ImageStatus.Left_Line,
+               ImageStatus.Right_Line,
+               ImageStatus.WhiteLine,
+               ImageStatus.OFFLine);
+    }
+
+    if (cross_hold_frames > 0)
+    {
+        ImageStatus.Road_type = Cross_ture;
+        cross_hold_frames--;
+        for (int y = 58; y > ImageStatus.OFFLine && y >= 8; y--)
+        {
+            ImageDeal[y].Center = 40;
+        }
+    }
+    else if (ImageStatus.Road_type == Cross_ture)
+    {
+        ImageStatus.Road_type = Normol;
+    }
+}
+
 // 绘制边界线 用于调试
 void DrawLine()
 {
@@ -2319,6 +2365,7 @@ void ImageProcess(void)
 
     DrawExtensionLine();
     RouteFilter();    // 路径滤波平滑 2us
+    CrossStraightHold();
                       /***元素处理*****/
     Element_Handle(); // 3us
     /***元素处理*****/
