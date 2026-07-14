@@ -781,8 +781,17 @@ static void DrawLinesProcess(void)
             break;
         }
 
-        else if (ImageDeal[Ysite].RightBorder <= 10 || ImageDeal[Ysite].LeftBorder >= 70)
+        else if ((ImageDeal[Ysite].RightBorder <= 10 && ImageDeal[Ysite].IsLeftFind == 'W') ||
+                 (ImageDeal[Ysite].LeftBorder >= 70 && ImageDeal[Ysite].IsRightFind == 'W'))
         {
+            printf("[LINELOST] edge stop y=%d L=%d R=%d LF=%c RF=%c W=%d OFF=%d\r\n",
+                   Ysite,
+                   ImageDeal[Ysite].LeftBorder,
+                   ImageDeal[Ysite].RightBorder,
+                   ImageDeal[Ysite].IsLeftFind,
+                   ImageDeal[Ysite].IsRightFind,
+                   ImageDeal[Ysite].Wide,
+                   ImageStatus.OFFLine);
             ImageStatus.OFFLine = Ysite + 1; // 当图像左边小于10或者右边达到一定值时停止巡线
             break;
         }
@@ -2459,8 +2468,7 @@ void ImageProcess(void)
     /***元素识别*****/
     ApplyRingSLineToMainLine();
 
-    if (IsNormalRoadRepairAllowed() || ImageStatus.Road_type == Cross_ture)
-        DrawExtensionLine();
+    DrawExtensionLine();
     RouteFilter();    // 路径滤波平滑 2us
     CrossBorderRepair();
                       /***元素处理*****/
