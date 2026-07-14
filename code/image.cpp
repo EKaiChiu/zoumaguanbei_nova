@@ -1,5 +1,4 @@
 #include "image.hpp"
-#include "imu660.hpp"
 
 static uint8 border_point;
 static uint8 top_point;
@@ -37,22 +36,8 @@ uint8_t *binar;                                                                 
 ROIRegionTypedef LargestWhiteRegion;
 
 
-static float Left_Ring_Yaw_Start = 0.0f;
-static float Left_Ring_Yaw_Last = 0.0f;
-static float Left_Ring_Yaw_Accumulated = 0.0f;
-static int Left_Ring_Yaw_Direction = 0;
-static bool Left_Ring_Yaw_Active = false;
 static int Left_Ring_Exit_Hold_Frames = 0;
 
-
-static float Wrap_Yaw_180(float yaw)
-{
-    while (yaw > 180.0f)
-        yaw -= 360.0f;
-    while (yaw < -180.0f)
-        yaw += 360.0f;
-    return yaw;
-}
 
 static int Left_Ring_Outward_Center(int left, int right)
 {
@@ -62,47 +47,6 @@ static int Left_Ring_Outward_Center(int left, int right)
     if (center > LCDW - 5)
         center = LCDW - 5;
     return center;
-}
-
-static void Left_Ring_Yaw_Start_Tracking(void)
-{
-    Left_Ring_Yaw_Start = imu_get_integrated_yaw();
-    Left_Ring_Yaw_Last = Left_Ring_Yaw_Start;
-    Left_Ring_Yaw_Accumulated = 0.0f;
-    Left_Ring_Yaw_Direction = 0;
-    Left_Ring_Yaw_Active = true;
-}
-
-static float Left_Ring_Yaw_Progress(void)
-{
-    if (!Left_Ring_Yaw_Active)
-        return 0.0f;
-
-    float current_yaw = imu_get_integrated_yaw();
-    float delta = Wrap_Yaw_180(current_yaw - Left_Ring_Yaw_Start);
-    float abs_delta = (delta < 0.0f) ? -delta : delta;
-    if (Left_Ring_Yaw_Direction == 0 && abs_delta >= 8.0f)
-    {
-        Left_Ring_Yaw_Direction = (delta >= 0.0f) ? 1 : -1;
-        Left_Ring_Yaw_Accumulated = abs_delta;
-        Left_Ring_Yaw_Last = current_yaw;
-        return Left_Ring_Yaw_Accumulated;
-    }
-
-    if (Left_Ring_Yaw_Direction == 0)
-    {
-        Left_Ring_Yaw_Last = current_yaw;
-        return abs_delta;
-    }
-
-    float step = Wrap_Yaw_180(current_yaw - Left_Ring_Yaw_Last) * Left_Ring_Yaw_Direction;
-    Left_Ring_Yaw_Last = current_yaw;
-    if (step > 0.0f)
-        Left_Ring_Yaw_Accumulated += step;
-    if (Left_Ring_Yaw_Accumulated > 360.0f)
-        Left_Ring_Yaw_Accumulated = 360.0f;
-
-    return Left_Ring_Yaw_Accumulated;
 }
 
 static bool Left_Ring_Exit_Image_Ready(void)
@@ -1407,7 +1351,6 @@ void Element_Handle_Left_Rings()
     {
 
         ImageFlag.image_element_rings_flag = 5;
-        Left_Ring_Yaw_Start_Tracking();
         printf("进入状态5\r\n");
         // wireless_uart_send_byte(5);
     }
@@ -1420,16 +1363,15 @@ void Element_Handle_Left_Rings()
         // wireless_uart_send_byte(6);
     }
 
-    // 小环岛出环
-    // 参考 yaw 出环法：入环后转过约 105 度，才开始寻找出口。
-    if (ImageFlag.image_element_rings_flag == 6 && Left_Ring_Yaw_Progress() >= 105.0f)
+    // Apex式图像出环：右侧丢线很少后，开始寻找右侧出口角点。
+    if (ImageFlag.image_element_rings_flag == 6 && ImageStatus.Right_Line <= 2)
     {
         ImageFlag.image_element_rings_flag = 7;
-        printf("[RING][L] 进入状态7 yaw=%.1f\n", Left_Ring_Yaw_Progress());
+        printf("[RING][L] 进入状态7 Right_Line=%d\r\n", ImageStatus.Right_Line);
         // wireless_uart_send_byte(8);
     }
     // 出环 环岛顶点判断
-    if (ImageFlag.ring_big_small == 1 && ImageFlag.image_element_rings_flag == 7)
+    if (ImageFlag.ring_big_small == 1 && ImageFlag.image_element_rings_flag == 7&& ImageStatus.Right_Line >= 5)
     {
         Point_Ysite = 0;
         Point_Xsite = 0;
@@ -1454,17 +1396,11 @@ void Element_Handle_Left_Rings()
                 Point_Xsite = 1;
         }
 
-        // 开源版本以 yaw 为主要出环条件；角点缺失时使用当前右边线作为兜底。
-        if (Left_Ring_Yaw_Progress() >= 250.0f)
+        // 找到右侧出口角点后进入 Apex式出环补线阶段。
+        if (Point_Ysite > ImageStatus.OFFLine + 5)
         {
-            if (Point_Ysite == 0)
-            {
-                Point_Ysite = 35;
-                Point_Xsite = ImageDeal[Point_Ysite].RightBorder;
-            }
             ImageFlag.image_element_rings_flag = 8;
-            printf("[RING][L] 进入状态8 yaw=%.1f point=(%d,%d)\r\n",
-                   Left_Ring_Yaw_Progress(), Point_Xsite, Point_Ysite);
+            printf("[RING][L] 进入状态8 point=(%d,%d)\r\n", Point_Xsite, Point_Ysite);
             // wireless_uart_send_byte(8);
             // Stop = 1;
         }
@@ -1488,24 +1424,16 @@ void Element_Handle_Left_Rings()
     //        if (Point_Ysite > 20)
     //          ImageFlag.image_element_rings_flag = 8;
     //    }
-    // 出环
+    // 出环收尾：只使用图像稳定条件，不使用陀螺仪。
     if (ImageFlag.image_element_rings_flag == 8)
     {
-        // 完成环岛的大部分转角后进入出环收尾，避免仅凭丢线误判。
-        float ring_yaw = Left_Ring_Yaw_Progress();
-        bool exit_ready_by_yaw = (ring_yaw >= 335.0f);
-        bool exit_ready_by_image = (ring_yaw >= 285.0f && Left_Ring_Exit_Image_Ready());
-        if (exit_ready_by_yaw || exit_ready_by_image)
+        if (Left_Ring_Exit_Image_Ready())
         {
             ImageFlag.image_element_rings_flag = 9;
             Left_Ring_Exit_Hold_Frames = 0;
-            printf("[RING][L] 进入状态9 yaw=%.1f\r\n", Left_Ring_Yaw_Progress());
+            printf("[RING][L] 进入状态9 image_ready\r\n");
             // wireless_uart_send_byte(9);
         }
-        //             else if(gyro_yaw>300)
-        //             {
-        //                 ImageFlag.image_element_rings_flag = 9;
-        //             }
     }
 
     // 环岛结束
@@ -1525,8 +1453,6 @@ void Element_Handle_Left_Rings()
             ImageFlag.image_element_rings_flag = 0;
             ImageFlag.image_element_rings = 0;
             ImageFlag.ring_big_small = 0;
-            Left_Ring_Yaw_Active = false;
-            Left_Ring_Yaw_Direction = 0;
             Left_Ring_Exit_Hold_Frames = 0;
             // ImageStatus.Road_type = Normol;
             // wireless_uart_send_byte(0);
@@ -1541,7 +1467,7 @@ void Element_Handle_Left_Rings()
     {
         for (int Ysite = 57; Ysite > ImageStatus.OFFLine; Ysite--)
         {
-            ImageDeal[Ysite].Center = ImageDeal[Ysite].RightBorder - Half_Road_Wide[Ysite] + 8;
+            ImageDeal[Ysite].Center = (ImageDeal[Ysite].RightBorder + ImageDeal[Ysite].LeftBorder) / 2;
         }
     }
     // 状态5/6保持入环补线；状态7开始使用开源版本的出口补线。

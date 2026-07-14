@@ -3,13 +3,13 @@
 #include "image.hpp"
 
 #include <math.h>
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
 
 enum AvoidState
 {
-    AVOID_DISABLED = 0,
-    AVOID_IDLE,
+    AVOID_DISABLED = -1,
+    AVOID_IDLE = 0,
     AVOID_SHIFT,
     AVOID_HOLD,
     AVOID_RETURN,
@@ -21,7 +21,8 @@ static int latest_vision_result = -1;
 static int avoid_dir = 0;
 static float avoid_bias = 0.0f;
 static uint16_t avoid_cnt = 0;
-static int printed_state = -1;
+static int printed_state = -100;
+static bool avoid_on_ring_latched = false;
 
 float Trans_line = 0.0f;
 
@@ -43,13 +44,12 @@ static bool avoid_is_right_result(int result)
     return result == 1;
 }
 
-static bool is_avoid_target(void)
+static bool avoid_has_target(void)
 {
-    return avoid_state != AVOID_DISABLED &&
-           (avoid_is_left_result(latest_vision_result) || avoid_is_right_result(latest_vision_result));
+    return avoid_is_left_result(latest_vision_result) || avoid_is_right_result(latest_vision_result);
 }
 
-static bool avoid_on_ring(void)
+static bool avoid_is_ring_now(void)
 {
     return ImageStatus.Road_type == LeftCirque ||
            ImageStatus.Road_type == RightCirque ||
@@ -58,12 +58,12 @@ static bool avoid_on_ring(void)
 
 static float get_avoid_right_max(void)
 {
-    return avoid_on_ring() ? AVOID_RING_RIGHT_MAX : AVOID_RIGHT_MAX;
+    return avoid_on_ring_latched ? AVOID_RING_RIGHT_MAX : AVOID_RIGHT_MAX;
 }
 
 static float get_avoid_left_max(void)
 {
-    return avoid_on_ring() ? AVOID_RING_LEFT_MAX : AVOID_LEFT_MAX;
+    return avoid_on_ring_latched ? AVOID_RING_LEFT_MAX : AVOID_LEFT_MAX;
 }
 
 static float approach_float(float value, float target, float step)
@@ -87,6 +87,18 @@ static float approach_float(float value, float target, float step)
     return value;
 }
 
+static void avoid_reset_runtime(AvoidState state)
+{
+    avoid_state = state;
+    latest_vision_result = -1;
+    avoid_dir = 0;
+    avoid_bias = 0.0f;
+    avoid_cnt = 0;
+    avoid_on_ring_latched = false;
+    Trans_line = 0.0f;
+    printed_state = -100;
+}
+
 static void avoid_print_state_once(void)
 {
     if (printed_state != (int)avoid_state)
@@ -98,24 +110,12 @@ static void avoid_print_state_once(void)
 
 void avoid_init(void)
 {
-    avoid_state = AVOID_DISABLED;
-    latest_vision_result = -1;
-    avoid_dir = 0;
-    avoid_bias = 0.0f;
-    avoid_cnt = 0;
-    printed_state = -1;
-    Trans_line = 0.0f;
+    avoid_reset_runtime(AVOID_DISABLED);
 }
 
 void avoid_set_enabled(bool enable)
 {
-    avoid_state = enable ? AVOID_IDLE : AVOID_DISABLED;
-    latest_vision_result = -1;
-    avoid_dir = 0;
-    avoid_bias = 0.0f;
-    avoid_cnt = 0;
-    printed_state = -1;
-    Trans_line = 0.0f;
+    avoid_reset_runtime(enable ? AVOID_IDLE : AVOID_DISABLED);
     printf("[AVOID] %s\r\n", enable ? "enabled" : "disabled");
 }
 
@@ -126,13 +126,16 @@ bool avoid_is_enabled(void)
 
 void avoid_set_vision_result(int result)
 {
+    if (avoid_state == AVOID_DISABLED)
+        return;
+
     latest_vision_result = result;
 }
 
 void avoid_force_start(void)
 {
     if (avoid_state == AVOID_DISABLED)
-        avoid_state = AVOID_IDLE;
+        return;
 
     latest_vision_result = 0;
 }
@@ -147,26 +150,30 @@ void avoid_update_control(void)
             avoid_bias = 0.0f;
             avoid_dir = 0;
             avoid_cnt = 0;
+            avoid_on_ring_latched = false;
             break;
 
         case AVOID_IDLE:
             avoid_bias = 0.0f;
             avoid_dir = 0;
             avoid_cnt = 0;
+            avoid_on_ring_latched = false;
 
-            if (is_avoid_target())
+            if (avoid_has_target())
             {
+                avoid_on_ring_latched = avoid_is_ring_now();
+
                 if (avoid_is_left_result(latest_vision_result))
                 {
-                    avoid_dir = 1;
+                    avoid_dir = 1;  // 左绕：目标中线向右偏
                 }
                 else if (avoid_is_right_result(latest_vision_result))
                 {
-                    avoid_dir = -1;
+                    avoid_dir = -1; // 右绕：目标中线向左偏
                 }
 
                 avoid_state = AVOID_SHIFT;
-                printed_state = -1;
+                printed_state = -100;
             }
             break;
 
@@ -178,7 +185,7 @@ void avoid_update_control(void)
             {
                 avoid_cnt = 0;
                 avoid_state = AVOID_HOLD;
-                printed_state = -1;
+                printed_state = -100;
             }
             break;
 
@@ -190,7 +197,7 @@ void avoid_update_control(void)
             {
                 avoid_cnt = 0;
                 avoid_state = AVOID_RETURN;
-                printed_state = -1;
+                printed_state = -100;
             }
             break;
 
@@ -203,7 +210,7 @@ void avoid_update_control(void)
                 avoid_dir = 0;
                 avoid_cnt = 0;
                 avoid_state = AVOID_LOCK;
-                printed_state = -1;
+                printed_state = -100;
             }
             break;
 
@@ -211,22 +218,18 @@ void avoid_update_control(void)
             avoid_bias = 0.0f;
             avoid_dir = 0;
 
-            if (!is_avoid_target())
+            if (!avoid_has_target())
             {
-                avoid_cnt = 0;
                 latest_vision_result = -1;
+                avoid_cnt = 0;
+                avoid_on_ring_latched = false;
                 avoid_state = AVOID_IDLE;
-                printed_state = -1;
+                printed_state = -100;
             }
             break;
 
         default:
-            avoid_state = AVOID_IDLE;
-            latest_vision_result = -1;
-            avoid_bias = 0.0f;
-            avoid_dir = 0;
-            avoid_cnt = 0;
-            printed_state = -1;
+            avoid_reset_runtime(AVOID_IDLE);
             break;
     }
 
