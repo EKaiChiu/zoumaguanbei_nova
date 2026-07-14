@@ -2032,6 +2032,8 @@ static void RouteFilter(void)
 static void CrossStraightHold(void)
 {
     static int cross_hold_frames = 0;
+    static int cross_release_frames = 0;
+    static bool cross_latched = false;
     bool ring_active = (ImageStatus.Road_type == LeftCirque ||
                         ImageStatus.Road_type == RightCirque ||
                         ImageFlag.image_element_rings_flag != 0);
@@ -2056,8 +2058,10 @@ static void CrossStraightHold(void)
                        ImageStatus.Left_Line >= 12 &&
                        ImageStatus.Right_Line >= 12);
 
-    if (cross_like)
+    if (cross_like && !cross_latched)
     {
+        cross_latched = true;
+        cross_release_frames = 0;
         cross_hold_frames = 6;
         ImageStatus.Road_type = Cross_ture;
         printf("[CROSS] hold L=%d R=%d WL=%d OFF=%d BC=%d BV=%d\r\n",
@@ -2067,6 +2071,17 @@ static void CrossStraightHold(void)
                ImageStatus.OFFLine,
                bottom_center,
                bottom_valid_rows);
+    }
+    else if (!cross_like)
+    {
+        if (cross_release_frames < 8)
+            cross_release_frames++;
+        if (cross_release_frames >= 4)
+            cross_latched = false;
+    }
+    else
+    {
+        cross_release_frames = 0;
     }
 
     if (cross_hold_frames > 0)
