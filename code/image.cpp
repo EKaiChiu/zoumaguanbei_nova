@@ -2144,13 +2144,15 @@ static void CrossBorderRepair(void)
         cross_hold_frames--;
 
         int top_y = ImageStatus.OFFLine + 2;
-        if (top_y < 4)
-            top_y = 4;
-        if (top_y > 35)
-            top_y = 35;
+        if (top_y < 32)
+            top_y = 32;
+        if (top_y > 42)
+            top_y = 42;
 
-        int left_top = 2;
-        int right_top = LCDW - 3;
+        int left_top = cross_bottom_left - 12;
+        int right_top = cross_bottom_right + 12;
+        left_top = CrossClampInt(left_top, 2, cross_bottom_left);
+        right_top = CrossClampInt(right_top, cross_bottom_right, LCDW - 3);
         for (int y = 58; y >= top_y; y--)
         {
             int left = InterpInt(cross_bottom_left, 58, left_top, top_y, y);
