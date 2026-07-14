@@ -1,6 +1,7 @@
 #include "avoid.hpp"
 
 #include "image.hpp"
+#include "Tof.hpp"
 
 #include <math.h>
 #include <stdint.h>
@@ -26,11 +27,11 @@ static bool avoid_on_ring_latched = false;
 
 float Trans_line = 0.0f;
 
-static const float AVOID_RIGHT_MAX = 15.0f;
-static const float AVOID_LEFT_MAX = 15.0f;
+static const float AVOID_RIGHT_MAX = 30.0f;
+static const float AVOID_LEFT_MAX = 30.0f;
 static const float AVOID_RING_RIGHT_MAX = 12.0f;
 static const float AVOID_RING_LEFT_MAX = 12.0f;
-static const float AVOID_SHIFT_STEP = 1.5f;
+static const float AVOID_SHIFT_STEP = 3.0f;
 static const float AVOID_RETURN_STEP = 2.0f;
 static const uint16_t AVOID_HOLD_TIME = 50; // 50 * 5ms = 250ms
 
@@ -51,8 +52,7 @@ static bool avoid_has_target(void)
 
 static bool avoid_is_ring_now(void)
 {
-    return ImageStatus.Road_type == LeftCirque ||
-           ImageStatus.Road_type == RightCirque ||
+    return ImageStatus.Road_type == LeftCirque || ImageStatus.Road_type == RightCirque ||
            ImageFlag.image_element_rings_flag != 0;
 }
 
@@ -165,7 +165,7 @@ void avoid_update_control(void)
 
                 if (avoid_is_left_result(latest_vision_result))
                 {
-                    avoid_dir = 1;  // 左绕：目标中线向右偏
+                    avoid_dir = 1; // 左绕：目标中线向右偏
                 }
                 else if (avoid_is_right_result(latest_vision_result))
                 {
@@ -174,6 +174,9 @@ void avoid_update_control(void)
 
                 avoid_state = AVOID_SHIFT;
                 printed_state = -100;
+                printf("[AVOID] start tof raw=%d filtered=%d fresh=%d vision=%d\r\n",
+                       tof_get_raw_mm(), tof_get_filtered_mm(), tof_has_fresh_data(150) ? 1 : 0,
+                       latest_vision_result);
             }
             break;
 

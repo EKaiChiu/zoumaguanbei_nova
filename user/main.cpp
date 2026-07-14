@@ -44,6 +44,7 @@
 #include "avoid.hpp"
 #include "beep.hpp"
 #include "menu.hpp"
+#include "Tof.hpp"
 // ====================== 全局宏定义 ======================
 #define SERVER_IP "10.18.55.68"
 
@@ -243,6 +244,8 @@ int main()
         printf("[VISION] init failed, vision disabled.\r\n");
     }
 
+    tof_init();
+
     printf("System init complete! Running...\r\n");
 
     // ====================== 5. 主循环 ======================
@@ -260,6 +263,7 @@ int main()
         }
 
         ImageProcess();
+        tof_update();
         Menu_Process();
 
         if (first_frame)
