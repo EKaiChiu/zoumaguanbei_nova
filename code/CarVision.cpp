@@ -14,29 +14,33 @@
 
 // ===================== 配置 =====================
 static const char *MODEL_PARAM = "tiny_classifier_6fp32.ncnn.param";
-static const char *MODEL_BIN = "tiny_classifier_6fp32.ncnn.bin";
+static const char *MODEL_BIN   = "tiny_classifier_6fp32.ncnn.bin";
 static const char *LABELS_PATH = "labels6.txt";
 
-static const int MODEL_SIZE = 96;
+static const int MODEL_SIZE   = 96;
 
-static const float CONFIDENCE_THRESH = 0.60f;
+static const float CONFIDENCE_THRESH = 0.40f;
 static const int INFER_INTERVAL = 2;
+
+// ---- 多帧投票参数 ----
+static const int VOTE_WINDOW_SIZE = 5;
+static const float VOTE_THRESHOLD_RATIO = 0.6f;
 
 // ---- 红框检测参数（与 cai3.py 一致）----
 // HSV 红色阈值
-static const int H1_LOW = 0, S1_LOW = 62, V1_LOW = 66;
-static const int H1_HIGH = 10, S1_HIGH = 255, V1_HIGH = 255;
-static const int H2_LOW = 161, S2_LOW = 62, V2_LOW = 66;
+static const int H1_LOW = 0,   S1_LOW = 43, V1_LOW = 46;
+static const int H1_HIGH = 10,  S1_HIGH = 255, V1_HIGH = 255;
+static const int H2_LOW = 161, S2_LOW = 43,  V2_LOW = 46;
 static const int H2_HIGH = 180, S2_HIGH = 255, V2_HIGH = 255;
 
 // 形态学核大小
 static const int MORPH_KERNEL_SIZE = 2;
 
 // 最小红色面积（像素）
-static const int MIN_RED_AREA = 60;
+static const int MIN_RED_AREA = 50;
 
-// 长宽比限制
-static const double MIN_ASPECT_RATIO = 0.3;
+// 长宽比限制（宽/高，必须 > 1，即宽度大于高度）
+static const double MIN_ASPECT_RATIO = 1.0;
 static const double MAX_ASPECT_RATIO = 5.0;
 
 // 目标红色面积占画面比例
@@ -62,15 +66,16 @@ struct Candidate
 
 class CarVisionImpl
 {
-  public:
+public:
     CarVisionImpl();
     ~CarVisionImpl();
 
     bool init();
     bool updateFromFrame(const cv::Mat &img, int &category);
+    int updateFromRgb565(const uint16_t *rgb565, int width, int height);
     void close();
 
-  private:
+private:
     bool loadLabels();
 
     RedBox findTargetRedBox(const cv::Mat &frame);
@@ -81,7 +86,7 @@ class CarVisionImpl
     int inferRoi(const cv::Mat &roi, float &confidence);
     int mapToBigId(const std::string &label) const;
 
-  private:
+private:
     ncnn::Net net_;
     std::vector<std::string> labels_;
 
@@ -93,11 +98,21 @@ class CarVisionImpl
     uint8_t rgb565_to_r_[32];
     uint8_t rgb565_to_g_[64];
     uint8_t rgb565_to_b_[32];
+
+    int vote_buffer_[VOTE_WINDOW_SIZE];
+    int vote_pos_;
+    int vote_count_;
+
+    void pushVote(int category);
+    int getVoteResult() const;
 };
 
 // ===================== 实现 =====================
-CarVisionImpl::CarVisionImpl() : frame_id_(0), last_small_id_(-1), last_big_id_(-1), last_confidence_(0.0f)
+CarVisionImpl::CarVisionImpl()
+    : frame_id_(0), last_small_id_(-1), last_big_id_(-1), last_confidence_(0.0f),
+      vote_pos_(0), vote_count_(0)
 {
+    memset(vote_buffer_, -1, sizeof(vote_buffer_));
 }
 
 CarVisionImpl::~CarVisionImpl()
@@ -243,22 +258,24 @@ bool CarVisionImpl::updateFromFrame(const cv::Mat &img, int &category)
 }
 
 // ===================== 粘连拆分 =====================
-void CarVisionImpl::trySplitStickyContour(const cv::Mat &mask, const cv::Rect &bbox, std::vector<Candidate> &candidates)
+void CarVisionImpl::trySplitStickyContour(const cv::Mat &mask, const cv::Rect &bbox,
+                                            std::vector<Candidate> &candidates)
 {
-    if (bbox.width == 0 || bbox.height == 0 || bbox.x < 0 || bbox.y < 0 || bbox.x + bbox.width > mask.cols ||
-        bbox.y + bbox.height > mask.rows)
+    if (bbox.width == 0 || bbox.height == 0 || bbox.x < 0 || bbox.y < 0 ||
+        bbox.x + bbox.width > mask.cols || bbox.y + bbox.height > mask.rows)
     {
         return;
     }
 
     cv::Mat roi_mask = mask(bbox).clone();
 
-    cv::Mat erosion_kernel =
-        cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(EROSION_KERNEL_SIZE, EROSION_KERNEL_SIZE));
+    cv::Mat erosion_kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE,
+                                                         cv::Size(EROSION_KERNEL_SIZE, EROSION_KERNEL_SIZE));
     cv::Mat roi_eroded;
     cv::erode(roi_mask, roi_eroded, erosion_kernel);
 
-    cv::Mat open_kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(MORPH_KERNEL_SIZE, MORPH_KERNEL_SIZE));
+    cv::Mat open_kernel = cv::getStructuringElement(cv::MORPH_RECT,
+                                                       cv::Size(MORPH_KERNEL_SIZE, MORPH_KERNEL_SIZE));
     cv::Mat roi_clean;
     cv::morphologyEx(roi_eroded, roi_clean, cv::MORPH_OPEN, open_kernel);
 
@@ -336,8 +353,10 @@ RedBox CarVisionImpl::findTargetRedBox(const cv::Mat &frame)
     cv::Mat hsv, mask1, mask2, mask;
     cv::cvtColor(frame, hsv, cv::COLOR_BGR2HSV);
 
-    cv::inRange(hsv, cv::Scalar(H1_LOW, S1_LOW, V1_LOW), cv::Scalar(H1_HIGH, S1_HIGH, V1_HIGH), mask1);
-    cv::inRange(hsv, cv::Scalar(H2_LOW, S2_LOW, V2_LOW), cv::Scalar(H2_HIGH, S2_HIGH, V2_HIGH), mask2);
+    cv::inRange(hsv, cv::Scalar(H1_LOW, S1_LOW, V1_LOW),
+                     cv::Scalar(H1_HIGH, S1_HIGH, V1_HIGH), mask1);
+    cv::inRange(hsv, cv::Scalar(H2_LOW, S2_LOW, V2_LOW),
+                     cv::Scalar(H2_HIGH, S2_HIGH, V2_HIGH), mask2);
 
     mask = mask1 | mask2;
 
@@ -348,7 +367,8 @@ RedBox CarVisionImpl::findTargetRedBox(const cv::Mat &frame)
         return r;
     }
 
-    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(MORPH_KERNEL_SIZE, MORPH_KERNEL_SIZE));
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT,
+                                                 cv::Size(MORPH_KERNEL_SIZE, MORPH_KERNEL_SIZE));
     cv::morphologyEx(mask, mask, cv::MORPH_OPEN, kernel);
 
     std::vector<std::vector<cv::Point>> contours;
@@ -603,6 +623,91 @@ int CarVisionImpl::mapToBigId(const std::string &label) const
     return -1;
 }
 
+void CarVisionImpl::pushVote(int category)
+{
+    vote_buffer_[vote_pos_] = category;
+    vote_pos_ = (vote_pos_ + 1) % VOTE_WINDOW_SIZE;
+    if (vote_count_ < VOTE_WINDOW_SIZE)
+    {
+        vote_count_++;
+    }
+}
+
+int CarVisionImpl::getVoteResult() const
+{
+    if (vote_count_ == 0)
+    {
+        return -1;
+    }
+
+    int counts[3] = {0, 0, 0};
+    int valid_count = 0;
+
+    for (int i = 0; i < vote_count_; i++)
+    {
+        int c = vote_buffer_[i];
+        if (c >= 0 && c < 3)
+        {
+            counts[c]++;
+            valid_count++;
+        }
+    }
+
+    if (valid_count == 0)
+    {
+        return -1;
+    }
+
+    int max_count = 0;
+    int result = -1;
+    for (int i = 0; i < 3; i++)
+    {
+        if (counts[i] > max_count)
+        {
+            max_count = counts[i];
+            result = i;
+        }
+    }
+
+    float ratio = (float)max_count / valid_count;
+    if (ratio >= VOTE_THRESHOLD_RATIO)
+    {
+        return result;
+    }
+
+    return -1;
+}
+
+int CarVisionImpl::updateFromRgb565(const uint16_t *rgb565, int width, int height)
+{
+    if (rgb565 == nullptr || width <= 0 || height <= 0)
+    {
+        pushVote(-1);
+        return getVoteResult();
+    }
+
+    cv::Mat frame(height, width, CV_8UC3);
+    for (int y = 0; y < height; y++)
+    {
+        for (int x = 0; x < width; x++)
+        {
+            uint16_t pixel = rgb565[y * width + x];
+            uint8_t r = rgb565_to_r_[(pixel >> 11) & 0x1F];
+            uint8_t g = rgb565_to_g_[(pixel >> 5) & 0x3F];
+            uint8_t b = rgb565_to_b_[pixel & 0x1F];
+            frame.at<cv::Vec3b>(y, x) = cv::Vec3b(b, g, r);
+        }
+    }
+
+    int category = -1;
+    if (updateFromFrame(frame, category))
+        pushVote(category);
+    else
+        pushVote(-1);
+
+    return getVoteResult();
+}
+
 void CarVisionImpl::close()
 {
 }
@@ -630,32 +735,14 @@ bool vision_init()
 
 int vision_get_from_rgb565(const uint16_t *rgb565, int width, int height)
 {
-    if (g_vision == nullptr || rgb565 == nullptr || width <= 0 || height <= 0)
+    if (g_vision == nullptr)
     {
         return -1;
     }
 
-    cv::Mat frame(height, width, CV_8UC3);
-    for (int y = 0; y < height; y++)
-    {
-        for (int x = 0; x < width; x++)
-        {
-            uint16_t pixel = rgb565[y * width + x];
-            uint8_t r = (uint8_t)(((pixel >> 11) & 0x1F) * 255 / 31);
-            uint8_t g = (uint8_t)(((pixel >> 5) & 0x3F) * 255 / 63);
-            uint8_t b = (uint8_t)((pixel & 0x1F) * 255 / 31);
-            frame.at<cv::Vec3b>(y, x) = cv::Vec3b(b, g, r);
-        }
-    }
-
-    int category = -1;
-    if (g_vision->updateFromFrame(frame, category))
-    {
-        return category;
-    }
-
-    return -1;
+    return g_vision->updateFromRgb565(rgb565, width, height);
 }
+
 void vision_close()
 {
     if (g_vision != nullptr)
