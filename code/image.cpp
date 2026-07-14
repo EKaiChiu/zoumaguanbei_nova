@@ -1373,6 +1373,7 @@ void Element_Handle_Left_Rings()
     // 出环 环岛顶点判断
     if (ImageFlag.ring_big_small == 1 && ImageFlag.image_element_rings_flag == 7&& ImageStatus.Right_Line >= 5)
     {
+        printf("状态8开始扫线");
         Point_Ysite = 0;
         Point_Xsite = 0;
         int min_right_x = LCDW;
@@ -1395,6 +1396,13 @@ void Element_Handle_Left_Rings()
             if (Point_Xsite < 1)
                 Point_Xsite = 1;
         }
+
+        printf("[RING][L][S7] Right_Line=%d OFF=%d point=(%d,%d) min_rx=%d\r\n",
+               ImageStatus.Right_Line,
+               ImageStatus.OFFLine,
+               Point_Xsite,
+               Point_Ysite,
+               min_right_x);
 
         // 找到右侧出口角点后进入 Apex式出环补线阶段。
         if (Point_Ysite > ImageStatus.OFFLine + 5)
@@ -1467,7 +1475,7 @@ void Element_Handle_Left_Rings()
     {
         for (int Ysite = 57; Ysite > ImageStatus.OFFLine; Ysite--)
         {
-            ImageDeal[Ysite].Center = (ImageDeal[Ysite].RightBorder + ImageDeal[Ysite].LeftBorder) / 2;
+            ImageDeal[Ysite].Center = ((ImageDeal[Ysite].RightBorder + ImageDeal[Ysite].LeftBorder) / 2)-5;
         }
     }
     // 状态5/6保持入环补线；状态7开始使用开源版本的出口补线。
