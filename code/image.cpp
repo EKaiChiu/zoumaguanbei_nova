@@ -2045,14 +2045,36 @@ static void RouteFilter(void)
     }
 }
 
-static void CrossStraightHold(void)
+static int CrossClampInt(int value, int low, int high)
+{
+    if (value < low)
+        return low;
+    if (value > high)
+        return high;
+    return value;
+}
+
+static int InterpInt(int x0, int y0, int x1, int y1, int y)
+{
+    if (y1 == y0)
+        return x0;
+    return x0 + (x1 - x0) * (y - y0) / (y1 - y0);
+}
+
+static void CrossBorderRepair(void)
 {
     static int cross_hold_frames = 0;
     static int cross_release_frames = 0;
     static bool cross_latched = false;
+    static int cross_bottom_left = 0;
+    static int cross_bottom_right = LCDW - 1;
+
     bool ring_active = (ImageStatus.Road_type == LeftCirque ||
                         ImageStatus.Road_type == RightCirque ||
                         ImageFlag.image_element_rings_flag != 0);
+
+    int bottom_left_sum = 0;
+    int bottom_right_sum = 0;
     int bottom_center_sum = 0;
     int bottom_valid_rows = 0;
     for (int y = 52; y <= 58; y++)
@@ -2060,10 +2082,13 @@ static void CrossStraightHold(void)
         if (ImageDeal[y].IsLeftFind == 'T' && ImageDeal[y].IsRightFind == 'T' &&
             ImageDeal[y].Wide >= 20 && ImageDeal[y].Wide <= 72)
         {
+            bottom_left_sum += ImageDeal[y].LeftBorder;
+            bottom_right_sum += ImageDeal[y].RightBorder;
             bottom_center_sum += ImageDeal[y].Center;
             bottom_valid_rows++;
         }
     }
+
     int bottom_center = (bottom_valid_rows > 0) ? (bottom_center_sum / bottom_valid_rows) : 40;
     bool bottom_stable = (bottom_valid_rows >= 4 && bottom_center >= 34 && bottom_center <= 46);
 
@@ -2079,12 +2104,16 @@ static void CrossStraightHold(void)
         cross_latched = true;
         cross_release_frames = 0;
         cross_hold_frames = 3;
+        cross_bottom_left = bottom_left_sum / bottom_valid_rows;
+        cross_bottom_right = bottom_right_sum / bottom_valid_rows;
         ImageStatus.Road_type = Cross_ture;
-        printf("[CROSS] hold L=%d R=%d WL=%d OFF=%d BC=%d BV=%d\r\n",
+        printf("[CROSS] repair L=%d R=%d WL=%d OFF=%d BL=%d BR=%d BC=%d BV=%d\r\n",
                ImageStatus.Left_Line,
                ImageStatus.Right_Line,
                ImageStatus.WhiteLine,
                ImageStatus.OFFLine,
+               cross_bottom_left,
+               cross_bottom_right,
                bottom_center,
                bottom_valid_rows);
     }
@@ -2104,9 +2133,28 @@ static void CrossStraightHold(void)
     {
         ImageStatus.Road_type = Cross_ture;
         cross_hold_frames--;
-        for (int y = 58; y > ImageStatus.OFFLine && y >= 8; y--)
+
+        int top_y = ImageStatus.OFFLine + 2;
+        if (top_y < 4)
+            top_y = 4;
+        if (top_y > 35)
+            top_y = 35;
+
+        int left_top = 2;
+        int right_top = LCDW - 3;
+        for (int y = 58; y >= top_y; y--)
         {
-            ImageDeal[y].Center = 40;
+            int left = InterpInt(cross_bottom_left, 58, left_top, top_y, y);
+            int right = InterpInt(cross_bottom_right, 58, right_top, top_y, y);
+            left = CrossClampInt(left, 1, LCDW - 4);
+            right = CrossClampInt(right, left + 8, LCDW - 2);
+
+            ImageDeal[y].LeftBorder = left;
+            ImageDeal[y].RightBorder = right;
+            ImageDeal[y].Wide = right - left;
+            ImageDeal[y].Center = (left + right) / 2;
+            ImageDeal[y].IsLeftFind = 'T';
+            ImageDeal[y].IsRightFind = 'T';
         }
     }
     else if (ImageStatus.Road_type == Cross_ture)
@@ -2414,7 +2462,7 @@ void ImageProcess(void)
     if (IsNormalRoadRepairAllowed() || ImageStatus.Road_type == Cross_ture)
         DrawExtensionLine();
     RouteFilter();    // 路径滤波平滑 2us
-    CrossStraightHold();
+    CrossBorderRepair();
                       /***元素处理*****/
     Element_Handle(); // 3us
     /***元素处理*****/
