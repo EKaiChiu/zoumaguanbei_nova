@@ -13,10 +13,12 @@ extern zf_driver_gpio beep_gpio;
 
 
 extern uint8 beep;
+extern volatile int car_start_flag;
 /*****************�ⲿ����������*****************/
 void init_all();
 void start_motor_timer();  // 🛡️ 首帧后启动电机控制
 void start_car();
+void stop_car();
 void stop_motor_timer();
 
 

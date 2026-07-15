@@ -26,13 +26,125 @@ static bool avoid_on_ring_latched = false;
 
 float Trans_line = 0.0f;
 
-static const float AVOID_RIGHT_MAX = 30.0f;
-static const float AVOID_LEFT_MAX = 30.0f;
-static const float AVOID_RING_RIGHT_MAX = 12.0f;
-static const float AVOID_RING_LEFT_MAX = 12.0f;
-static const float AVOID_SHIFT_STEP = 3.0f;
-static const float AVOID_RETURN_STEP = 2.0f;
-static const uint16_t AVOID_HOLD_TIME = 50; // 50 * 5ms = 250ms
+static float avoid_right_max = 30.0f;
+static float avoid_left_max = 30.0f;
+static float avoid_ring_right_max = 12.0f;
+static float avoid_ring_left_max = 12.0f;
+static float avoid_shift_step = 3.0f;
+static float avoid_return_step = 2.0f;
+static uint16_t avoid_hold_time = 50; // 50 * 5ms = 250ms
+
+static float clamp_float_local(float value, float min_value, float max_value)
+{
+    if (value < min_value)
+        return min_value;
+    if (value > max_value)
+        return max_value;
+    return value;
+}
+
+const char *avoid_get_param_name(int index)
+{
+    static const char *names[AVOID_PARAM_COUNT] = {
+        "RightMax", "LeftMax", "RingR", "RingL", "Shift", "Return", "Hold"};
+
+    if (index < 0 || index >= AVOID_PARAM_COUNT)
+        return "Unknown";
+    return names[index];
+}
+
+float avoid_get_param_value(int index)
+{
+    switch (index)
+    {
+        case 0: return avoid_right_max;
+        case 1: return avoid_left_max;
+        case 2: return avoid_ring_right_max;
+        case 3: return avoid_ring_left_max;
+        case 4: return avoid_shift_step;
+        case 5: return avoid_return_step;
+        case 6: return (float)avoid_hold_time;
+        default: return 0.0f;
+    }
+}
+
+void avoid_set_param_value(int index, float value)
+{
+    switch (index)
+    {
+        case 0:
+            avoid_right_max = clamp_float_local(value, 0.0f, 80.0f);
+            break;
+        case 1:
+            avoid_left_max = clamp_float_local(value, 0.0f, 80.0f);
+            break;
+        case 2:
+            avoid_ring_right_max = clamp_float_local(value, 0.0f, 50.0f);
+            break;
+        case 3:
+            avoid_ring_left_max = clamp_float_local(value, 0.0f, 50.0f);
+            break;
+        case 4:
+            avoid_shift_step = clamp_float_local(value, 0.5f, 20.0f);
+            break;
+        case 5:
+            avoid_return_step = clamp_float_local(value, 0.5f, 20.0f);
+            break;
+        case 6:
+        {
+            int hold = (int)(value + 0.5f);
+            if (hold < 0)
+                hold = 0;
+            if (hold > 500)
+                hold = 500;
+            avoid_hold_time = (uint16_t)hold;
+            break;
+        }
+        default:
+            break;
+    }
+}
+
+void avoid_adjust_param(int index, int direction)
+{
+    if (direction == 0)
+        return;
+
+    float dir = direction > 0 ? 1.0f : -1.0f;
+    switch (index)
+    {
+        case 0:
+            avoid_right_max = clamp_float_local(avoid_right_max + dir * 1.0f, 0.0f, 80.0f);
+            break;
+        case 1:
+            avoid_left_max = clamp_float_local(avoid_left_max + dir * 1.0f, 0.0f, 80.0f);
+            break;
+        case 2:
+            avoid_ring_right_max = clamp_float_local(avoid_ring_right_max + dir * 1.0f, 0.0f, 50.0f);
+            break;
+        case 3:
+            avoid_ring_left_max = clamp_float_local(avoid_ring_left_max + dir * 1.0f, 0.0f, 50.0f);
+            break;
+        case 4:
+            avoid_shift_step = clamp_float_local(avoid_shift_step + dir * 0.5f, 0.5f, 20.0f);
+            break;
+        case 5:
+            avoid_return_step = clamp_float_local(avoid_return_step + dir * 0.5f, 0.5f, 20.0f);
+            break;
+        case 6:
+        {
+            int value = (int)avoid_hold_time + (direction > 0 ? 5 : -5);
+            if (value < 0)
+                value = 0;
+            if (value > 500)
+                value = 500;
+            avoid_hold_time = (uint16_t)value;
+            break;
+        }
+        default:
+            break;
+    }
+}
 
 static bool avoid_is_left_result(int result)
 {
@@ -57,12 +169,12 @@ static bool avoid_is_ring_now(void)
 
 static float get_avoid_right_max(void)
 {
-    return avoid_on_ring_latched ? AVOID_RING_RIGHT_MAX : AVOID_RIGHT_MAX;
+    return avoid_on_ring_latched ? avoid_ring_right_max : avoid_right_max;
 }
 
 static float get_avoid_left_max(void)
 {
-    return avoid_on_ring_latched ? AVOID_RING_LEFT_MAX : AVOID_LEFT_MAX;
+    return avoid_on_ring_latched ? avoid_ring_left_max : avoid_left_max;
 }
 
 static float approach_float(float value, float target, float step)
@@ -178,7 +290,7 @@ void avoid_update_control(void)
 
         case AVOID_SHIFT:
             target_bias = (avoid_dir < 0) ? -get_avoid_right_max() : get_avoid_left_max();
-            avoid_bias = approach_float(avoid_bias, target_bias, AVOID_SHIFT_STEP);
+            avoid_bias = approach_float(avoid_bias, target_bias, avoid_shift_step);
 
             if (fabsf(avoid_bias - target_bias) < 0.5f)
             {
@@ -192,7 +304,7 @@ void avoid_update_control(void)
             avoid_bias = (avoid_dir < 0) ? -get_avoid_right_max() : get_avoid_left_max();
             avoid_cnt++;
 
-            if (avoid_cnt >= AVOID_HOLD_TIME)
+            if (avoid_cnt >= avoid_hold_time)
             {
                 avoid_cnt = 0;
                 avoid_state = AVOID_RETURN;
@@ -201,7 +313,7 @@ void avoid_update_control(void)
             break;
 
         case AVOID_RETURN:
-            avoid_bias = approach_float(avoid_bias, 0.0f, AVOID_RETURN_STEP);
+            avoid_bias = approach_float(avoid_bias, 0.0f, avoid_return_step);
 
             if (fabsf(avoid_bias) < 0.5f)
             {

@@ -279,7 +279,7 @@ int main()
                ImageStatus.Road_type);
 #endif
         uint16_t *rgb_image = uvc_cam.get_rgb_image_ptr();
-        if (rgb_image != nullptr)
+        if (rgb_image != nullptr && car_start_flag)
         {
             static int vision_frame_counter = 0;
             if (vision_ready && ++vision_frame_counter >= 10)
@@ -312,7 +312,19 @@ int main()
         static uint16 screen_buf[SCREEN_H][SCREEN_W]; // IPS200显存缓冲区（RGB565格式，逐飞派原版尺寸）
         memset(screen_buf, 0, sizeof(screen_buf));
 
-        if (rgb_image != nullptr)
+        static int last_display_start_flag = -1;
+        if (last_display_start_flag != car_start_flag)
+        {
+            ips200.clear();
+            last_display_start_flag = car_start_flag;
+        }
+
+        if (!car_start_flag)
+        {
+            ips200.clear();
+            Menu_Draw();
+        }
+        else if (rgb_image != nullptr)
         {
             // 步骤1: 直接复制RGB图像到screen_buf（逐飞派原版：不放大）
             for (int y = 0; y < SCREEN_H; y++) // 120行

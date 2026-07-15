@@ -17,6 +17,10 @@ void ips200_screen_display(void); // ⭐ 主显示函数：整合所有基础绘
 void draw_boundary_on_screen(uint16 screen_buf[][160]);   // 🔴左右边界线→RGB565缓冲区
 void draw_trajectory_on_screen(uint16 screen_buf[][160]); // 🔵中线轨迹→RGB565缓冲区
 void draw_offline_line_on_screen(uint16 screen_buf[][160]); // 🔴丢线位置横线→RGB565缓冲区
+int towpoint_get_up_row(void);
+int towpoint_get_down_row(void);
+void towpoint_set_up_row(int row);
+void towpoint_set_down_row(int row);
 void draw_towpoint_lines_on_screen(uint16 screen_buf[][160]); // 🟢前瞻点范围横线→RGB565缓冲区
 void draw_red_target_on_screen(uint16 screen_buf[][160], red_detect *result); //🟢 青色目标标注→RGB565缓冲区
 // ==================== 图传标注功能 ====================

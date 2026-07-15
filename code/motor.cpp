@@ -100,6 +100,11 @@ void motor_set_line_base_speed(int speed)
     line_base_speed = speed;
 }
 
+int motor_get_line_base_speed(void)
+{
+    return line_base_speed;
+}
+
 static void setup_speed_test_target()
 {
     if (test_wheel == 1)
@@ -659,6 +664,7 @@ void motor_diff_pid1()
     }
 
     float abs_turn_error = abs_float(turn_error);
+    bool ring_turning = (ImageFlag.image_element_rings_flag >= 5 && ImageFlag.image_element_rings_flag <= 8);
     float current_kp = diff_kp;
     float current_kd = 0.20f;
     if (abs_turn_error <= 3.5f)
@@ -666,23 +672,27 @@ void motor_diff_pid1()
         current_kp = diff_kp * 0.7f;
         current_kd = 0.12f;
     }
+    else if (!ring_turning && abs_turn_error >= 12.0f)
+    {
+        current_kp = 8.0f; // strongest normal bend turn
+        current_kd = 0.34f;
+    }
     else if (abs_turn_error >= 8.0f)
     {
-        current_kp = 8.0f; // stronger bend turn
+        current_kp = 6.0f; // stronger bend turn
         current_kd = 0.30f;
     }
     else
     {
-        current_kp = 6.0f;
+        current_kp = 5.0f;
         current_kd = 0.22f;
     }
 
     // 转向 PD 控制
 
     float turn_output = current_kp * turn_error + current_kd * (turn_error - last_turn_error);
-    bool ring_turning = (ImageFlag.image_element_rings_flag >= 5 && ImageFlag.image_element_rings_flag <= 8);
     if (ring_turning)
-        turn_output *= 1.30f;
+        turn_output *= 1.50f;
     bool turn_cross_zero = (turn_error * last_turn_error) < 0.0f;
     last_turn_error = turn_error;
 
@@ -717,6 +727,8 @@ void motor_diff_pid1()
                           ImageFlag.image_element_rings_flag != 0);
     if (ring_detected && current_base_speed > 180)
         current_base_speed = 180;
+    if (ImageFlag.image_element_rings_flag == 1)
+        current_base_speed -= 30;
     if (abs_turn_error > 3.0f)
         current_base_speed -= (int)((abs_turn_error - 3.0f) * 9.0f);
     if (abs_turn_error >= 12.0f && current_base_speed > 60)

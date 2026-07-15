@@ -51,6 +51,17 @@ void start_car()
     printf("[SYSTEM] car launch enabled.\r\n");
 }
 
+void stop_car()
+{
+    if (!car_start_flag)
+        return;
+
+    car_start_flag = 0;
+    motor1_pwm_1.set_duty(0);
+    motor2_pwm_2.set_duty(0);
+    printf("[SYSTEM] car launch disabled.\r\n");
+}
+
 void stop_motor_timer()
 {
     image_ready_flag = 0;

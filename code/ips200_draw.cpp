@@ -16,6 +16,38 @@
  */
 
 #include "ips200_draw.hpp"
+
+static int towpoint_up_row = 55;
+static int towpoint_down_row = 58;
+
+static int clamp_towpoint_row(int row)
+{
+    if (row < 0)
+        return 0;
+    if (row > 59)
+        return 59;
+    return row;
+}
+
+int towpoint_get_up_row(void)
+{
+    return towpoint_up_row;
+}
+
+int towpoint_get_down_row(void)
+{
+    return towpoint_down_row;
+}
+
+void towpoint_set_up_row(int row)
+{
+    towpoint_up_row = clamp_towpoint_row(row);
+}
+
+void towpoint_set_down_row(int row)
+{
+    towpoint_down_row = clamp_towpoint_row(row);
+}
 #include "image.hpp"
 #include "red_detect.hpp"
 
@@ -304,10 +336,10 @@ void draw_towpoint_lines_on_screen(uint16 screen_buf[][160])
 {
     const uint16 CYAN_COLOR = 0x07FF; // RGB565青色: R=0,G=63,B=31
 
-    int towpoint_up_y = 55 * 2;
-    int towpoint_down_y = 58 * 2;
+    int towpoint_up_y = towpoint_up_row * 2;
+    int towpoint_down_y = towpoint_down_row * 2;
 
-    // 🟢 55行横线
+    // 🟢 上前瞻行横线
     if (towpoint_up_y >= 0 && towpoint_up_y < 120)
     {
         for (int x = 0; x < 160; x++)
@@ -316,7 +348,7 @@ void draw_towpoint_lines_on_screen(uint16 screen_buf[][160])
         }
     }
 
-    // 🟢 58行横线
+    // 🟢 下前瞻行横线
     if (towpoint_down_y >= 0 && towpoint_down_y < 120)
     {
         for (int x = 0; x < 160; x++)

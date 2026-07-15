@@ -11,6 +11,14 @@ void avoid_init(void);
 void avoid_set_enabled(bool enable);
 bool avoid_is_enabled(void);
 
+#define AVOID_PARAM_COUNT 7
+
+/* Menu tuning interface: index 0~6 maps to avoid.cpp parameters. */
+const char *avoid_get_param_name(int index);
+float avoid_get_param_value(int index);
+void avoid_set_param_value(int index, float value);
+void avoid_adjust_param(int index, int direction);
+
 /* 外部传入视觉识别结果。绕行开启时 result=0 左绕，result=1 右绕，其他值不触发。 */
 void avoid_set_vision_result(int result);
 void avoid_force_start(void);
