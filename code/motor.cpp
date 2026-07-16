@@ -46,6 +46,12 @@ float diff_speed_error;
 int16 diff_speedl_expect, diff_speedr_expect;
 
 float diff_kp = 2.6f, diff_kd = 3.5f; // 差速PID参数（快速响应）
+static float turn_kp_low = 1.82f;
+static float turn_kp_mid = 5.0f;
+static float turn_kp_big = 6.0f;
+static float turn_kp_sharp = 8.0f;
+static float turn_ring_multiplier = 1.50f;
+static int sharp_turn_print_cnt = 0;
 float k = 2.868;
 float dif = 0;
 
@@ -61,6 +67,12 @@ int speed_pwm_min_r = 725;
 float speed_pwm_feedforward_l = 10.6f;
 float speed_pwm_feedforward_r = 10.3f;
 static int line_base_speed = 160;
+static float speed_ratio_ring = 0.90f;
+static float speed_ratio_small = 0.80f;
+static float speed_ratio_mid = 0.68f;
+static float speed_ratio_big = 0.55f;
+static float speed_ratio_sharp = 0.45f;
+static int speed_expect_limit = 500;
 
 static void reset_speed_pid_state()
 {
@@ -103,6 +115,195 @@ void motor_set_line_base_speed(int speed)
 int motor_get_line_base_speed(void)
 {
     return line_base_speed;
+}
+
+static float clamp_speed_ratio(float value)
+{
+    if (value < 0.1f)
+        return 0.1f;
+    if (value > 1.5f)
+        return 1.5f;
+    return value;
+}
+
+static int clamp_speed_limit(int value)
+{
+    if (value < 100)
+        return 100;
+    if (value > 800)
+        return 800;
+    return value;
+}
+
+const char *motor_get_speed_param_name(int index)
+{
+    switch (index)
+    {
+        case 0:
+            return "Base";
+        case 1:
+            return "Ring";
+        case 2:
+            return "Small";
+        case 3:
+            return "Mid";
+        case 4:
+            return "Big";
+        case 5:
+            return "Sharp";
+        case 6:
+            return "Limit";
+        default:
+            return "Unknown";
+    }
+}
+
+float motor_get_speed_param_value(int index)
+{
+    switch (index)
+    {
+        case 0:
+            return (float)line_base_speed;
+        case 1:
+            return speed_ratio_ring;
+        case 2:
+            return speed_ratio_small;
+        case 3:
+            return speed_ratio_mid;
+        case 4:
+            return speed_ratio_big;
+        case 5:
+            return speed_ratio_sharp;
+        case 6:
+            return (float)speed_expect_limit;
+        default:
+            return 0.0f;
+    }
+}
+
+void motor_set_speed_param_value(int index, float value)
+{
+    switch (index)
+    {
+        case 0:
+            motor_set_line_base_speed((int)(value + 0.5f));
+            break;
+        case 1:
+            speed_ratio_ring = clamp_speed_ratio(value);
+            break;
+        case 2:
+            speed_ratio_small = clamp_speed_ratio(value);
+            break;
+        case 3:
+            speed_ratio_mid = clamp_speed_ratio(value);
+            break;
+        case 4:
+            speed_ratio_big = clamp_speed_ratio(value);
+            break;
+        case 5:
+            speed_ratio_sharp = clamp_speed_ratio(value);
+            break;
+        case 6:
+            speed_expect_limit = clamp_speed_limit((int)(value + 0.5f));
+            break;
+        default:
+            break;
+    }
+}
+
+void motor_adjust_speed_param(int index, int direction)
+{
+    if (index == 0)
+    {
+        motor_set_line_base_speed(line_base_speed + direction * 5);
+        return;
+    }
+    if (index == 6)
+    {
+        motor_set_speed_param_value(index, (float)(speed_expect_limit + direction * 50));
+        return;
+    }
+
+    motor_set_speed_param_value(index, motor_get_speed_param_value(index) + direction * 0.1f);
+}
+
+static float clamp_turn_param(float value, float min_value, float max_value)
+{
+    if (value < min_value)
+        return min_value;
+    if (value > max_value)
+        return max_value;
+    return value;
+}
+
+const char *motor_get_turn_param_name(int index)
+{
+    switch (index)
+    {
+        case 0:
+            return "LowKp";
+        case 1:
+            return "MidKp";
+        case 2:
+            return "BigKp";
+        case 3:
+            return "SharpKp";
+        case 4:
+            return "RingMul";
+        default:
+            return "Unknown";
+    }
+}
+
+float motor_get_turn_param_value(int index)
+{
+    switch (index)
+    {
+        case 0:
+            return turn_kp_low;
+        case 1:
+            return turn_kp_mid;
+        case 2:
+            return turn_kp_big;
+        case 3:
+            return turn_kp_sharp;
+        case 4:
+            return turn_ring_multiplier;
+        default:
+            return 0.0f;
+    }
+}
+
+void motor_set_turn_param_value(int index, float value)
+{
+    switch (index)
+    {
+        case 0:
+            turn_kp_low = clamp_turn_param(value, 0.0f, 20.0f);
+            break;
+        case 1:
+            turn_kp_mid = clamp_turn_param(value, 0.0f, 20.0f);
+            break;
+        case 2:
+            turn_kp_big = clamp_turn_param(value, 0.0f, 20.0f);
+            break;
+        case 3:
+            turn_kp_sharp = clamp_turn_param(value, 0.0f, 20.0f);
+            break;
+        case 4:
+            turn_ring_multiplier = clamp_turn_param(value, 0.1f, 3.0f);
+            break;
+        default:
+            break;
+    }
+}
+
+void motor_adjust_turn_param(int index, int direction)
+{
+    if (direction == 0)
+        return;
+    float step = 0.1f;
+    motor_set_turn_param_value(index, motor_get_turn_param_value(index) + (direction > 0 ? step : -step));
 }
 
 static void setup_speed_test_target()
@@ -643,16 +844,6 @@ void motor_diff_pid1()
     static float last_turn_error = 0;
     static float filtered_turn_output = 0;
 
-    // 左环岛状态8由yaw状态机控制，直接接管差速并强制向左出环。
-    if (ImageStatus.Road_type == LeftCirque && ImageFlag.image_element_rings_flag == 8)
-    {
-        diff_speedl_expect = -100;
-        diff_speedr_expect = 220;
-        last_turn_error = 0.0f;
-        filtered_turn_output = 0.0f;
-        return;
-    }
-
     // 图像偏差（根据实际调整中线值）
     float target_center = 40.0f + avoid_get_trans_line();
     target_center = clamp_float(target_center, 5.0f, 75.0f);
@@ -669,22 +860,28 @@ void motor_diff_pid1()
     float current_kd = 0.20f;
     if (abs_turn_error <= 3.5f)
     {
-        current_kp = diff_kp * 0.7f;
+        current_kp = turn_kp_low;
         current_kd = 0.12f;
     }
     else if (!ring_turning && abs_turn_error >= 12.0f)
     {
-        current_kp = 8.0f; // strongest normal bend turn
+        current_kp = turn_kp_sharp; // strongest normal bend turn
         current_kd = 0.34f;
     }
     else if (abs_turn_error >= 8.0f)
     {
-        current_kp = 6.0f; // stronger bend turn
+        current_kp = turn_kp_big; // stronger bend turn
         current_kd = 0.30f;
+        if (++sharp_turn_print_cnt >= 10)
+        {
+            sharp_turn_print_cnt = 0;
+            printf("[TURN] sharp err=%.1f kp=%.1f kd=%.2f det=%.1f target=%.1f\r\n", abs_turn_error, current_kp,
+                   current_kd, (float)ImageStatus.Det_True, target_center);
+        }
     }
     else
     {
-        current_kp = 5.0f;
+        current_kp = turn_kp_mid;
         current_kd = 0.22f;
     }
 
@@ -692,7 +889,7 @@ void motor_diff_pid1()
 
     float turn_output = current_kp * turn_error + current_kd * (turn_error - last_turn_error);
     if (ring_turning)
-        turn_output *= 1.50f;
+        turn_output *= turn_ring_multiplier;
     bool turn_cross_zero = (turn_error * last_turn_error) < 0.0f;
     last_turn_error = turn_error;
 
@@ -723,35 +920,78 @@ void motor_diff_pid1()
     }
 
     int current_base_speed = line_base_speed;
+
+    // 环岛限速：只要进入环岛相关状态，就先按 Ring 倍率限制最高速度。
+    // Ring/Small/Mid/Big/Sharp 都可以在 Speed 菜单里以 0.1 步长调整。
     bool ring_detected = (ImageStatus.Road_type == LeftCirque || ImageStatus.Road_type == RightCirque ||
                           ImageFlag.image_element_rings_flag != 0);
-    if (ring_detected && current_base_speed > 180)
-        current_base_speed = 180;
+    int ring_speed_limit = (int)(line_base_speed * speed_ratio_ring);
+    if (ring_detected && current_base_speed > ring_speed_limit)
+        current_base_speed = ring_speed_limit;
+
+    // 初见环岛阶段额外减速，给入环识别和补线留反应时间。
     if (ImageFlag.image_element_rings_flag == 1)
         current_base_speed -= 30;
-    if (abs_turn_error > 3.0f)
-        current_base_speed -= (int)((abs_turn_error - 3.0f) * 9.0f);
-    if (abs_turn_error >= 12.0f && current_base_speed > 60)
-        current_base_speed = 100;
-    else if (abs_turn_error >= 8.0f && current_base_speed > 90)
-        current_base_speed = 120;
-    else if (abs_turn_error >= 4.5f && current_base_speed > 140)
-        current_base_speed = 140;
+
+    // 普通弯道分档限速，按图像偏差 abs_turn_error 分为四档：
+    // 小弯  : 4.5 <= error < 8.0   -> base * Small
+    // 中弯  : 8.0 <= error < 12.0  -> base * Mid
+    // 大弯  : 12.0 <= error < 16.0 -> base * Big
+    // 急弯  : error >= 16.0        -> base * Sharp
+    if (abs_turn_error >= 16.0f)
+    {
+        int speed_limit = (int)(line_base_speed * speed_ratio_sharp);
+        if (current_base_speed > speed_limit)
+            current_base_speed = speed_limit;
+    }
+    else if (abs_turn_error >= 12.0f)
+    {
+        int speed_limit = (int)(line_base_speed * speed_ratio_big);
+        if (current_base_speed > speed_limit)
+            current_base_speed = speed_limit;
+    }
+    else if (abs_turn_error >= 8.0f)
+    {
+        int speed_limit = (int)(line_base_speed * speed_ratio_mid);
+        if (current_base_speed > speed_limit)
+            current_base_speed = speed_limit;
+    }
+    else if (abs_turn_error >= 4.5f)
+    {
+        int speed_limit = (int)(line_base_speed * speed_ratio_small);
+        if (current_base_speed > speed_limit)
+            current_base_speed = speed_limit;
+    }
+
+    // 最低速度保护：防止限速过低导致电机克服不了静摩擦。
     if (current_base_speed < 45)
         current_base_speed = 45;
 
-    // 计算左右轮目标速度
-    diff_speedl_expect = current_base_speed + (int)filtered_turn_output;
-    diff_speedr_expect = current_base_speed - (int)filtered_turn_output;
+    // 计算左右轮目标速度：非对称差速，外轮少加速、内轮多减速，减少外轮打滑和外抛。
+    const float outer_turn_gain = 0.35f;
+    const float inner_turn_gain = 1.35f;
+    if (filtered_turn_output >= 0.0f)
+    {
+        // output > 0 时左轮更快、右轮更慢，车辆向右转：左轮是外轮，右轮是内轮。
+        diff_speedl_expect = current_base_speed + (int)(filtered_turn_output * outer_turn_gain);
+        diff_speedr_expect = current_base_speed - (int)(filtered_turn_output * inner_turn_gain);
+    }
+    else
+    {
+        // output < 0 时右轮更快、左轮更慢，车辆向左转：右轮是外轮，左轮是内轮。
+        float turn_abs = -filtered_turn_output;
+        diff_speedl_expect = current_base_speed - (int)(turn_abs * inner_turn_gain);
+        diff_speedr_expect = current_base_speed + (int)(turn_abs * outer_turn_gain);
+    }
 
-    // 极限保护（慢速模式）
-    if (diff_speedl_expect < -400)
-        diff_speedl_expect = -400;
-    if (diff_speedr_expect < -400)
-        diff_speedr_expect = -400;
+    // 极限保护：左右轮目标速度统一限制在 -Limit 到 +Limit。
+    if (diff_speedl_expect < -speed_expect_limit)
+        diff_speedl_expect = -speed_expect_limit;
+    if (diff_speedr_expect < -speed_expect_limit)
+        diff_speedr_expect = -speed_expect_limit;
 
-    if (diff_speedl_expect > 400)
-        diff_speedl_expect = 400;
-    if (diff_speedr_expect > 400)
-        diff_speedr_expect = 400;
+    if (diff_speedl_expect > speed_expect_limit)
+        diff_speedl_expect = speed_expect_limit;
+    if (diff_speedr_expect > speed_expect_limit)
+        diff_speedr_expect = speed_expect_limit;
 }

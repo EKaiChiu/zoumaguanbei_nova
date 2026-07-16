@@ -1,5 +1,5 @@
 #include "image.hpp"
-
+#include "beep.hpp"
 static uint8 border_point;
 static uint8 top_point;
 
@@ -54,6 +54,16 @@ static int Right_Ring_Outward_Center(int left, int right)
         center = 4;
     if (center > LCDW - 5)
         center = LCDW - 5;
+    return center;
+}
+
+static int Left_Ring_Exit_Center(int left, int right)
+{
+    int center = (left + right) / 2 - 8;
+    if (center < 4)
+        center = 4;
+    if (center > 34)
+        center = 34;
     return center;
 }
 
@@ -772,8 +782,8 @@ static void DrawLinesProcess(void)
 static void DrawExtensionLine(void) // 处理延长线部分，确保边界连续 巡线部分斜率
 {
     /***************************************************延长右边界 ***********************************************/
-    if ((ImageStatus.Road_type != Barn_in && ImageStatus.Road_type != Ramp) /*&&ImageStatus.pansancha_Lenth* OX==0*/ &&
-        ImageStatus.Road_type != Cross_ture && ImageStatus.Road_type != LeftCirque &&
+    if ((ImageStatus.Road_type != Barn_in && ImageStatus.Road_type != Ramp) /*&&ImageStatus.pansancha_Lenth* OX==0*/
+        && ImageStatus.Road_type != Cross_ture && ImageStatus.Road_type != LeftCirque &&
         ImageStatus.Road_type != RightCirque) // g5.22  6.22注意注释  ǵĻ���//过三叉元素时
     {
 
@@ -1176,11 +1186,12 @@ void Search_Border_OTSU(uint8 imageInput[LCDH][LCDW], uint8 Row, uint8 Col, uint
 // 左环岛判断
 void Element_Judgment_Left_Rings()
 {
-    // printf("[左环岛状态1条件] 右侧丢线=%d <=2:%s 左侧丢线=%d >=20:%s OFFLine=%d <6:%s WhiteLine=%d <=5:%s L55=%c "
+    // printf("[左环岛状态1条件] 右侧丢线=%d <=2:%s 左侧丢线=%d >=20:%s OFFLine=%d <6:%s WhiteLine=%d <=5:%s L55=%c
+    // "
     //        "L56=%c L57=%c L58=%c\r\n",
     //        ImageStatus.Right_Line, (ImageStatus.Right_Line <= 2) ? "是" : "否", ImageStatus.Left_Line,
-    //        (ImageStatus.Left_Line >= 20) ? "是" : "否", ImageStatus.OFFLine, (ImageStatus.OFFLine < 6) ? "是" : "否",
-    //        ImageStatus.WhiteLine, (ImageStatus.WhiteLine <= 5) ? "是" : "否", ImageDeal[55].IsLeftFind,
+    //        (ImageStatus.Left_Line >= 20) ? "是" : "否", ImageStatus.OFFLine, (ImageStatus.OFFLine < 6) ? "是" :
+    //        "否", ImageStatus.WhiteLine, (ImageStatus.WhiteLine <= 5) ? "是" : "否", ImageDeal[55].IsLeftFind,
     //        ImageDeal[56].IsLeftFind, ImageDeal[57].IsLeftFind, ImageDeal[58].IsLeftFind);
     // //    Disf = 0;
     if (ImageStatus.Right_Line > 2 || ImageStatus.Left_Line < 13 // 13
@@ -1390,6 +1401,7 @@ void Element_Handle_Left_Rings()
     if (ImageFlag.image_element_rings_flag == 6 && ImageStatus.Right_Line <= 2)
     {
         ImageFlag.image_element_rings_flag = 7;
+
         printf("[RING][L] 进入状态7 Right_Line=%d\r\n", ImageStatus.Right_Line);
         // wireless_uart_send_byte(8);
     }
@@ -1397,22 +1409,56 @@ void Element_Handle_Left_Rings()
     if (ImageFlag.ring_big_small == 1 && ImageFlag.image_element_rings_flag == 7 && ImageStatus.Right_Line >= 5)
     {
         printf("状态8开始扫线");
+
         Point_Ysite = 0;
         Point_Xsite = 0;
         int min_right_x = LCDW;
-        int search_start = ImageStatus.OFFLine + 2;
-        if (search_start < 2)
-            search_start = 2;
+        int search_start = ImageStatus.OFFLine + 10;
+        if (search_start < 8)
+            search_start = 8;
+        if (search_start > 50)
+            search_start = 50;
 
-        for (int Ysite = search_start; Ysite < 54; Ysite++)
+        // 优先找右边界局部最小点，避免上方噪点/补线抢走全局最小值。
+        for (int Ysite = search_start; Ysite <= 50; Ysite++)
         {
+            if (ImageDeal[Ysite].IsRightFind == 'W')
+                continue;
+
             int candidate_x = ImageDeal[Ysite].RightBorder;
-            if (candidate_x < min_right_x)
+            if (candidate_x <= 5 || candidate_x >= LCDW - 2)
+                continue;
+
+            if (candidate_x <= ImageDeal[Ysite - 1].RightBorder && candidate_x <= ImageDeal[Ysite - 2].RightBorder &&
+                candidate_x <= ImageDeal[Ysite - 3].RightBorder && candidate_x < ImageDeal[Ysite + 1].RightBorder &&
+                candidate_x < ImageDeal[Ysite + 2].RightBorder && candidate_x < ImageDeal[Ysite + 3].RightBorder)
             {
                 min_right_x = candidate_x;
                 Point_Ysite = Ysite;
+                break;
             }
         }
+
+        // 如果局部角点没有出现，再只在有效出环范围内找最小X兜底。
+        if (Point_Ysite == 0)
+        {
+            for (int Ysite = search_start; Ysite < 54; Ysite++)
+            {
+                if (ImageDeal[Ysite].IsRightFind == 'W')
+                    continue;
+
+                int candidate_x = ImageDeal[Ysite].RightBorder;
+                if (candidate_x <= 5 || candidate_x >= LCDW - 2)
+                    continue;
+
+                if (candidate_x < min_right_x)
+                {
+                    min_right_x = candidate_x;
+                    Point_Ysite = Ysite;
+                }
+            }
+        }
+
         if (Point_Ysite > 0)
         {
             Point_Xsite = min_right_x - 3;
@@ -1420,13 +1466,14 @@ void Element_Handle_Left_Rings()
                 Point_Xsite = 1;
         }
 
-        printf("[RING][L][S7] Right_Line=%d OFF=%d point=(%d,%d) min_rx=%d\r\n", ImageStatus.Right_Line,
-               ImageStatus.OFFLine, Point_Xsite, Point_Ysite, min_right_x);
+        printf("[RING][L][S7] Right_Line=%d OFF=%d search=%d point=(%d,%d) min_rx=%d\r\n", ImageStatus.Right_Line,
+               ImageStatus.OFFLine, search_start, Point_Xsite, Point_Ysite, min_right_x);
 
         // 找到右侧出口角点后进入 Apex式出环补线阶段。
-        if (Point_Ysite > ImageStatus.OFFLine + 5)
+        if (Point_Ysite > ImageStatus.OFFLine + 15)
         {
             ImageFlag.image_element_rings_flag = 8;
+            beep_short();
             printf("[RING][L] 进入状态8 point=(%d,%d)\r\n", Point_Xsite, Point_Ysite);
             // wireless_uart_send_byte(8);
             // Stop = 1;
@@ -1458,6 +1505,7 @@ void Element_Handle_Left_Rings()
         {
             ImageFlag.image_element_rings_flag = 9;
             Left_Ring_Exit_Hold_Frames = 0;
+            beep_short();
             printf("[RING][L] 进入状态9 image_ready\r\n");
             // wireless_uart_send_byte(9);
         }
@@ -1586,17 +1634,15 @@ void Element_Handle_Left_Rings()
     // 开源状态4：右下出口角点连接到图像上方 x=27。
     if (ImageFlag.image_element_rings_flag == 7 && Point_Ysite > ImageStatus.OFFLine)
     {
-        int repair_y = ImageStatus.OFFLine;
-        float slope = (float)(Point_Xsite - 27) / (float)(Point_Ysite - repair_y);
+        int repair_y = 10;
+        float slope = (float)(Point_Xsite - 1) / (float)(Point_Ysite - repair_y);
         for (int y = Point_Ysite; y > repair_y; y--)
         {
-            int repaired_right = 27 + (int)(slope * (y - repair_y));
+            int repaired_right = 1 + (int)(slope * (y - repair_y));
             if (repaired_right > ImageDeal[y].LeftBorder + 4 && repaired_right < LCDW - 2)
             {
                 ImageDeal[y].RightBorder = repaired_right;
-                ImageDeal[y].Center = Left_Ring_Outward_Center(ImageDeal[y].LeftBorder, repaired_right);
-                if (ImageDeal[y].Center < 46)
-                    ImageDeal[y].Center = 46;
+                ImageDeal[y].Center = Left_Ring_Exit_Center(ImageDeal[y].LeftBorder, repaired_right);
             }
         }
     }
@@ -1629,9 +1675,7 @@ void Element_Handle_Left_Rings()
             if (repaired_right > ImageDeal[y].LeftBorder + 4)
             {
                 ImageDeal[y].RightBorder = repaired_right;
-                ImageDeal[y].Center = Left_Ring_Outward_Center(ImageDeal[y].LeftBorder, repaired_right);
-                if (ImageDeal[y].Center < 46)
-                    ImageDeal[y].Center = 46;
+                ImageDeal[y].Center = Left_Ring_Exit_Center(ImageDeal[y].LeftBorder, repaired_right);
             }
         }
     }
@@ -1652,8 +1696,8 @@ void Element_Handle_Left_Rings()
     //        }
     //        for (int Ysite = 57; Ysite > Repair_Point_Ysite-3; Ysite--)         // 补线
     //        {
-    //            ImageDeal[Ysite].RightBorder = (ImageDeal[58].RightBorder - Repair_Point_Xsite) * (Ysite - 58) / (58 -
-    //            Repair_Point_Ysite)  + ImageDeal[58].RightBorder; ImageDeal[Ysite].Center =
+    //            ImageDeal[Ysite].RightBorder = (ImageDeal[58].RightBorder - Repair_Point_Xsite) * (Ysite - 58) /
+    //            (58 - Repair_Point_Ysite)  + ImageDeal[58].RightBorder; ImageDeal[Ysite].Center =
     //            (ImageDeal[Ysite].RightBorder + ImageDeal[Ysite].LeftBorder) / 2;
     //        }
     //    }
@@ -1991,7 +2035,7 @@ void Element_Test(void)
         //  &&SystemData.Stop == 0
     )
     {
-         Element_Judgment_Left_Rings();  // 左环岛判断
+        Element_Judgment_Left_Rings(); // 左环岛判断
         // Element_Judgment_Right_Rings(); // 右环岛判断
     }
 }

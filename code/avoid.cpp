@@ -26,8 +26,8 @@ static bool avoid_on_ring_latched = false;
 
 float Trans_line = 0.0f;
 
-static float avoid_right_max = 30.0f;
-static float avoid_left_max = 30.0f;
+static float avoid_right_max = 20.0f;
+static float avoid_left_max = 20.0f;
 static float avoid_ring_right_max = 12.0f;
 static float avoid_ring_left_max = 12.0f;
 static float avoid_shift_step = 3.0f;

@@ -31,4 +31,17 @@ void motor_diff_pid1();
 void motor_set_line_base_speed(int speed);
 int motor_get_line_base_speed(void);
 
+#define MOTOR_SPEED_PARAM_COUNT 7
+#define MOTOR_TURN_PARAM_COUNT 5
+
+const char *motor_get_speed_param_name(int index);
+float motor_get_speed_param_value(int index);
+void motor_set_speed_param_value(int index, float value);
+void motor_adjust_speed_param(int index, int direction);
+
+const char *motor_get_turn_param_name(int index);
+float motor_get_turn_param_value(int index);
+void motor_set_turn_param_value(int index, float value);
+void motor_adjust_turn_param(int index, int direction);
+
 #endif

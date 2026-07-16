@@ -45,6 +45,7 @@
 #include "beep.hpp"
 #include "menu.hpp"
 #include "Tof.hpp"
+#include "StartLine.hpp"
 // ====================== 全局宏定义 ======================
 #define SERVER_IP "10.18.55.68"
 
@@ -281,8 +282,19 @@ int main()
         uint16_t *rgb_image = uvc_cam.get_rgb_image_ptr();
         if (rgb_image != nullptr && car_start_flag)
         {
+            static int startline_frame_counter = 0;
+            if (++startline_frame_counter >= 5)
+            {
+                startline_frame_counter = 0;
+                if (startline_update_from_rgb565(rgb_image, UVC_WIDTH, UVC_HEIGHT))
+                {
+                    printf("[STARTLINE] stop by zebra count=%d\r\n", startline_get_count());
+                    Menu_StopToMenu();
+                }
+            }
+
             static int vision_frame_counter = 0;
-            if (vision_ready && ++vision_frame_counter >= 10)
+            if (vision_ready && car_start_flag && ++vision_frame_counter >= 10)
             {
                 vision_frame_counter = 0;
                 int vision_result = vision_get_from_rgb565(rgb_image, UVC_WIDTH, UVC_HEIGHT);
@@ -321,7 +333,6 @@ int main()
 
         if (!car_start_flag)
         {
-            ips200.clear();
             Menu_Draw();
         }
         else if (rgb_image != nullptr)

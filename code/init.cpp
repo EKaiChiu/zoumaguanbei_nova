@@ -3,6 +3,8 @@
 #include "imu660.hpp"
 #include "motor.hpp"
 #include "MyFlash.hpp"
+#include "StartLine.hpp"
+#include "Test.hpp"
 
 
 uint8 beep=0;
@@ -24,6 +26,7 @@ void Interrupt()//中断函数
   if(!image_ready_flag) return;  // 🛡️ 图像没就绪时不执行电机控制！
   if(!car_start_flag) return;    // 未发车时不执行电机控制
   imu_yaw_print_task(imu_dev, 0.02f);  // IMU yaw debug task, 20ms period
+  test_update(imu_dev, 0.02f);          // Test菜单调试任务
   motor_control();         // 核心：每5ms执行一次差速和电机PID
 }
 
@@ -47,8 +50,9 @@ void start_car()
     if (car_start_flag)
         return;
 
+    startline_reset();
     car_start_flag = 1;
-    printf("[SYSTEM] car launch enabled.\r\n");
+    printf("[SYSTEM] car launch enabled. startline reset target=%d\r\n", startline_get_stop_target());
 }
 
 void stop_car()
@@ -100,6 +104,7 @@ void init_all()
     motor_init();          // 电机 PWM 初始化
     avoid_init();
     avoid_set_enabled(AVOID_MODE != 0);
+    test_init();
     
      motor_argument();      // 🌟 必须取消注释！给目标速度和 PID 参数赋值
     
