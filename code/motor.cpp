@@ -967,22 +967,9 @@ void motor_diff_pid1()
     if (current_base_speed < 45)
         current_base_speed = 45;
 
-    // 计算左右轮目标速度：非对称差速，外轮少加速、内轮多减速，减少外轮打滑和外抛。
-    const float outer_turn_gain = 0.35f;
-    const float inner_turn_gain = 1.35f;
-    if (filtered_turn_output >= 0.0f)
-    {
-        // output > 0 时左轮更快、右轮更慢，车辆向右转：左轮是外轮，右轮是内轮。
-        diff_speedl_expect = current_base_speed + (int)(filtered_turn_output * outer_turn_gain);
-        diff_speedr_expect = current_base_speed - (int)(filtered_turn_output * inner_turn_gain);
-    }
-    else
-    {
-        // output < 0 时右轮更快、左轮更慢，车辆向左转：右轮是外轮，左轮是内轮。
-        float turn_abs = -filtered_turn_output;
-        diff_speedl_expect = current_base_speed - (int)(turn_abs * inner_turn_gain);
-        diff_speedr_expect = current_base_speed + (int)(turn_abs * outer_turn_gain);
-    }
+    // 计算左右轮目标速度
+    diff_speedl_expect = current_base_speed + (int)filtered_turn_output;
+    diff_speedr_expect = current_base_speed - (int)filtered_turn_output;
 
     // 极限保护：左右轮目标速度统一限制在 -Limit 到 +Limit。
     if (diff_speedl_expect < -speed_expect_limit)

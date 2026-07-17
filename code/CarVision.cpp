@@ -13,9 +13,9 @@
 #include <opencv2/opencv.hpp>
 
 // ===================== 配置 =====================
-static const char *MODEL_PARAM = "tiny_classifier_6fp32.ncnn.param";
-static const char *MODEL_BIN = "tiny_classifier_6fp32.ncnn.bin";
-static const char *LABELS_PATH = "labels6.txt";
+static const char *MODEL_PARAM = "tiny_classifier_8fp32.ncnn.param";
+static const char *MODEL_BIN = "tiny_classifier_8fp32.ncnn.bin";
+static const char *LABELS_PATH = "labels8.txt";
 
 static const int MODEL_SIZE = 96;
 
@@ -42,10 +42,10 @@ static const double MAX_ASPECT_RATIO = 5.0;
 // 目标红色面积占画面比例
 static const double TARGET_RED_AREA_RATIO = 0.002;
 
-// 粘连判定阈值
-static const int STICKY_AREA_MULT = 5;
-static const int STICKY_MIN_HEIGHT = 20;
-static const int EROSION_KERNEL_SIZE = 5;
+// 粘连判定阈值（已禁用）
+// static const int STICKY_AREA_MULT = 5;
+// static const int STICKY_MIN_HEIGHT = 20;
+// static const int EROSION_KERNEL_SIZE = 5;
 
 // ===================== 内部结构 =====================
 struct RedBox
@@ -75,7 +75,6 @@ class CarVisionImpl
     bool loadLabels();
 
     RedBox findTargetRedBox(const cv::Mat &frame);
-    void trySplitStickyContour(const cv::Mat &mask, const cv::Rect &bbox, std::vector<Candidate> &candidates);
     bool computeRoiRect(const cv::Mat &frame, const RedBox &red_box, cv::Rect &roi_rect);
     cv::Mat cropRoi(const cv::Mat &frame, const RedBox &red_box);
 
@@ -243,95 +242,7 @@ bool CarVisionImpl::updateFromFrame(const cv::Mat &img, int &category)
     return true;
 }
 
-// ===================== 粘连拆分 =====================
-void CarVisionImpl::trySplitStickyContour(const cv::Mat &mask, const cv::Rect &bbox, std::vector<Candidate> &candidates)
-{
-    if (bbox.width == 0 || bbox.height == 0 || bbox.x < 0 || bbox.y < 0 || bbox.x + bbox.width > mask.cols ||
-        bbox.y + bbox.height > mask.rows)
-    {
-        return;
-    }
-
-    cv::Mat roi_mask = mask(bbox).clone();
-
-    cv::Mat erosion_kernel =
-        cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(EROSION_KERNEL_SIZE, EROSION_KERNEL_SIZE));
-    cv::Mat roi_eroded;
-    cv::erode(roi_mask, roi_eroded, erosion_kernel);
-
-    cv::Mat open_kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(MORPH_KERNEL_SIZE, MORPH_KERNEL_SIZE));
-    cv::Mat roi_clean;
-    cv::morphologyEx(roi_eroded, roi_clean, cv::MORPH_OPEN, open_kernel);
-
-    cv::Mat labels;
-    cv::Mat stats;
-    cv::Mat centroids;
-    int num_labels = cv::connectedComponentsWithStats(roi_clean, labels, stats, centroids, 8, CV_32S);
-
-    std::vector<Candidate> sub_regions;
-
-    for (int label_id = 1; label_id < num_labels; label_id++)
-    {
-        int sw = stats.at<int>(label_id, cv::CC_STAT_WIDTH);
-        int sh = stats.at<int>(label_id, cv::CC_STAT_HEIGHT);
-        int sx = stats.at<int>(label_id, cv::CC_STAT_LEFT);
-        int sy = stats.at<int>(label_id, cv::CC_STAT_TOP);
-        int eroded_area = stats.at<int>(label_id, cv::CC_STAT_AREA);
-
-        if (eroded_area < MIN_RED_AREA || sw == 0 || sh == 0)
-        {
-            continue;
-        }
-
-        cv::Mat sub_mask = (labels == label_id);
-        sub_mask.convertTo(sub_mask, CV_8U);
-        sub_mask = sub_mask.mul(roi_mask);
-        int actual_area = cv::countNonZero(sub_mask);
-
-        int abs_x = bbox.x + sx;
-        int abs_y = bbox.y + sy;
-
-        double aspect_ratio = (sh > 0) ? (double)sw / sh : 0;
-        if (aspect_ratio < MIN_ASPECT_RATIO || aspect_ratio > MAX_ASPECT_RATIO)
-        {
-            continue;
-        }
-
-        double area_ratio = (double)actual_area / (bbox.width * bbox.height);
-        Candidate c;
-        c.area = actual_area;
-        c.area_ratio = area_ratio;
-        c.x = abs_x;
-        c.y = abs_y;
-        c.w = sw;
-        c.h = sh;
-        sub_regions.push_back(c);
-    }
-
-    if (sub_regions.size() <= 1)
-    {
-        int actual_area = cv::countNonZero(roi_mask);
-        double area_ratio = (double)actual_area / (bbox.width * bbox.height);
-        double aspect_ratio = (bbox.height > 0) ? (double)bbox.width / bbox.height : 0;
-
-        Candidate c;
-        c.area = actual_area;
-        c.area_ratio = area_ratio;
-        c.x = bbox.x;
-        c.y = bbox.y;
-        c.w = bbox.width;
-        c.h = bbox.height;
-        candidates.push_back(c);
-        return;
-    }
-
-    for (size_t i = 0; i < sub_regions.size(); i++)
-    {
-        candidates.push_back(sub_regions[i]);
-    }
-}
-
-// ===================== 红框检测（与 cai3.py 逻辑一致）=====================
+// ===================== 红框检测 ======================
 RedBox CarVisionImpl::findTargetRedBox(const cv::Mat &frame)
 {
     cv::Mat hsv, mask1, mask2, mask;
@@ -368,12 +279,6 @@ RedBox CarVisionImpl::findTargetRedBox(const cv::Mat &frame)
     {
         double area = cv::contourArea(contours[i]);
         cv::Rect bbox = cv::boundingRect(contours[i]);
-
-        if (area >= MIN_RED_AREA * STICKY_AREA_MULT && bbox.height > STICKY_MIN_HEIGHT)
-        {
-            trySplitStickyContour(mask, bbox, candidates);
-            continue;
-        }
 
         if (area < MIN_RED_AREA)
         {
@@ -589,14 +494,17 @@ int CarVisionImpl::inferRoi(const cv::Mat &roi, float &confidence)
 
 int CarVisionImpl::mapToBigId(const std::string &label) const
 {
+    // 武器类 → 0
     if (label == "qiang" || label == "dan" || label == "weapon")
     {
         return 0;
     }
-    if (label == "ji" || label == "wang" || label == "supplies")
+    // 补给类（ji 拆分为 ji1、ji2）→ 1
+    if (label == "ji1" || label == "ji2" || label == "wang" || label == "wang2" || label == "supplies")
     {
         return 1;
     }
+    // 车辆类 → 2
     if (label == "jiu" || label == "zhuang" || label == "vehicle")
     {
         return 2;

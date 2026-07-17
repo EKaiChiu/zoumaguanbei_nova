@@ -1,8 +1,6 @@
 #ifndef ips200_draw_HPP
 #define ips200_draw_HPP
 #include "zf_common_headfile.hpp"
-typedef struct red_detect_t red_detect;  // 前向声明，避免循环包含
-#include "red_detect.hpp"
 void draw_left_line(void);        // 画左边界线（🔴红色）
 void draw_right_line(void);       // 画右边界线（🔴红色）  
 void draw_center_line(void);      // 画中线轨迹（🔵蓝色）
@@ -22,7 +20,6 @@ int towpoint_get_down_row(void);
 void towpoint_set_up_row(int row);
 void towpoint_set_down_row(int row);
 void draw_towpoint_lines_on_screen(uint16 screen_buf[][160]); // 🟢前瞻点范围横线→RGB565缓冲区
-void draw_red_target_on_screen(uint16 screen_buf[][160], red_detect *result); //🟢 青色目标标注→RGB565缓冲区
 // ==================== 图传标注功能 ====================
 // 为逐飞助手的灰度图像添加调试标注（浅灰色边界+中灰色轨迹）
 void draw_annotation_on_imagecopy(void);  // 边界+轨迹→灰度image_copy数组

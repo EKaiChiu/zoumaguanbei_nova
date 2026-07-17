@@ -49,7 +49,6 @@ void towpoint_set_down_row(int row)
     towpoint_down_row = clamp_towpoint_row(row);
 }
 #include "image.hpp"
-#include "red_detect.hpp"
 
 // ════════════════════════════════════════════════
 // 全局变量声明
@@ -175,68 +174,6 @@ void draw_towpoint_down(void)
         }
     }
 }
-// ════════════════════════════════════════════════
-// 功能 #7：画红色目标边框（🩵青色矩形框）
-//     数据源：red_detect 结构体的四个边界坐标
-//     坐标已在160×120空间，无需放大
-// ════════════════════════════════════════════════
-void draw_red_target_on_screen(uint16 screen_buf[][160], red_detect *result)
-{
-    if (result == NULL || !result->is_found)
-        return;
-
-    int left = result->red_left_bound;
-    int right = result->red_right_bound;
-    int top = result->red_upper_bound;
-    int bottom = result->red_lower_bound;
-
-    // 夹紧到屏幕范围
-    if (left < 0)
-        left = 0;
-    if (right > 159)
-        right = 159;
-    if (top < 0)
-        top = 0;
-    if (bottom > 119)
-        bottom = 119;
-    if (left >= right || top >= bottom)
-        return;
-
-    // 上边 + 下边（2像素宽）
-    for (int x = left; x <= right; x++)
-    {
-        screen_buf[top][x] = RGB565_CYAN;
-        screen_buf[top + 1][x] = RGB565_CYAN;
-        screen_buf[bottom][x] = RGB565_CYAN;
-        screen_buf[bottom - 1][x] = RGB565_CYAN;
-    }
-
-    // 左边 + 右边（2像素宽）
-    for (int y = top + 2; y <= bottom - 2; y++)
-    {
-        screen_buf[y][left] = RGB565_CYAN;
-        screen_buf[y][left + 1] = RGB565_CYAN;
-        screen_buf[y][right] = RGB565_CYAN;
-        screen_buf[y][right - 1] = RGB565_CYAN;
-    }
-
-    // 中心十字标记
-    int cx = result->center_x;
-    int cy = result->center_y;
-    for (int dx = -3; dx <= 3; dx++)
-    {
-        int nx = cx + dx;
-        if (nx >= 0 && nx < 160)
-            screen_buf[cy][nx] = RGB565_CYAN;
-    }
-    for (int dy = -3; dy <= 3; dy++)
-    {
-        int ny = cy + dy;
-        if (ny >= 0 && ny < 120)
-            screen_buf[ny][cx] = RGB565_CYAN;
-    }
-}
-
 /*
 函数名称：void ips200_screen_display(void)
 功能说明：IPS200屏幕显示（参考工程tft180风格）
@@ -256,7 +193,6 @@ void ips200_screen_display(void)
     draw_right_line();                           // 🔴 右边界线（参考：drawrightline）
     draw_center_line();                          // 🔵 中线轨迹（参考：drawcenterline）
     draw_offline();                              // 🔴 丢线位置（参考：drawoffline）
-    draw_red_target_on_screen(nullptr, nullptr); // 🟢 红色目标标注（示例调用，实际使用时传入正确参数）
     // draw_towpoint_up();     // 🟢 前瞻点上界（参考：drawtowpointUP）
     // draw_towpoint_down();   // 🟢 前瞻点下界（参考：drawtowpointDOWN）
 }

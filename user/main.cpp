@@ -36,6 +36,7 @@
 #include "zf_driver_tcp_client.hpp"
 #include "zf_device_uvc.hpp"
 #include "zf_driver_pwm.hpp"
+#include "zf_driver_pit.hpp"
 #include "init.hpp"
 #include "image.hpp"
 #include "config.hpp"
@@ -48,6 +49,7 @@
 #include "StartLine.hpp"
 // ====================== 全局宏定义 ======================
 #define SERVER_IP "10.18.55.68"
+#define VISION_TIMER_PERIOD_MS 50
 
 // ====================== 网络配置宏定义 ======================
 #define PORT 8086
@@ -73,6 +75,13 @@ uint8 x1_boundary[UVC_HEIGHT], x2_boundary[UVC_HEIGHT], x3_boundary[UVC_HEIGHT];
 uint8 y1_boundary[UVC_WIDTH], y2_boundary[UVC_WIDTH], y3_boundary[UVC_WIDTH];
 uint8 image_copy[LCDH][LCDW];
 
+// CarVision 定时识别结果：由固定周期定时器更新，主循环只读取显示/鸣笛。
+zf_driver_pit vision_timer;
+static volatile int latest_vision_result = -1;
+static volatile int vision_timer_ready = 0;
+static volatile int vision_task_busy = 0;
+static volatile int vision_beep_request = 0;
+
 // ====================== TCP通信包装函数 ======================
 zf_driver_tcp_client *g_tcp_client = nullptr;
 
@@ -86,6 +95,43 @@ enum image_transfer_state_t
 
 static image_transfer_state_t image_transfer_state = IMAGE_TRANSFER_DEFAULT_STATE;
 static int image_transfer_fail_count = 0;
+
+static void VisionInterrupt()
+{
+    if (!vision_timer_ready)
+        return;
+    if (!car_start_flag)
+        return;
+    if (vision_task_busy)
+        return;
+
+    vision_task_busy = 1;
+    uint16_t *rgb_image = uvc_cam.get_rgb_image_ptr();
+    if (rgb_image != nullptr)
+    {
+        int vision_result = vision_get_from_rgb565(rgb_image, UVC_WIDTH, UVC_HEIGHT);
+        latest_vision_result = vision_result;
+
+        static bool vision_beep_latched = false;
+        if (vision_result >= 0 && vision_result <= 2)
+        {
+            avoid_set_vision_result(vision_result);
+            const char *vision_name = (vision_result == 0) ? "武器" : ((vision_result == 1) ? "补给" : "车辆");
+            printf("vision_get() result: %s\n", vision_name);
+            if (!vision_beep_latched)
+            {
+                vision_beep_request = vision_result + 1;
+                vision_beep_latched = true;
+            }
+        }
+        else
+        {
+            avoid_set_vision_result(-1);
+            vision_beep_latched = false;
+        }
+    }
+    vision_task_busy = 0;
+}
 
 static uint32 send_wrapper(const uint8 *buff, uint32 length)
 {
@@ -244,6 +290,12 @@ int main()
     {
         printf("[VISION] init failed, vision disabled.\r\n");
     }
+    else
+    {
+        vision_timer_ready = 1;
+        vision_timer.init_ms(VISION_TIMER_PERIOD_MS, VisionInterrupt);
+        printf("[VISION] timer enabled, period=%d ms\r\n", VISION_TIMER_PERIOD_MS);
+    }
 
     tof_init();
 
@@ -251,7 +303,6 @@ int main()
 
     // ====================== 5. 主循环 ======================
     static int first_frame = 1; // 第一帧标记
-    static int latest_vision_result = -1; // 最近一次 vision_get 返回值，显示在屏幕上
 
     while (true)
     {
@@ -266,6 +317,13 @@ int main()
         ImageProcess();
         tof_update();
         Menu_Process();
+
+        int beep_request = vision_beep_request;
+        if (beep_request > 0)
+        {
+            vision_beep_request = 0;
+            beep_times(beep_request);
+        }
 
         if (first_frame)
         {
@@ -290,30 +348,6 @@ int main()
                 {
                     printf("[STARTLINE] stop by zebra count=%d\r\n", startline_get_count());
                     Menu_StopToMenu();
-                }
-            }
-
-            static int vision_frame_counter = 0;
-            if (vision_ready && car_start_flag && ++vision_frame_counter >= 10)
-            {
-                vision_frame_counter = 0;
-                int vision_result = vision_get_from_rgb565(rgb_image, UVC_WIDTH, UVC_HEIGHT);
-                latest_vision_result = vision_result;
-                static bool vision_beep_latched = false;
-                if (vision_result >= 0 && vision_result <= 2)
-                {
-                    avoid_set_vision_result(vision_result);
-                    printf("vision_get() result: %d\n", vision_result);
-                    if (!vision_beep_latched)
-                    {
-                        beep_times(vision_result + 1);
-                        vision_beep_latched = true;
-                    }
-                }
-                else
-                {
-                    avoid_set_vision_result(-1);
-                    vision_beep_latched = false;
                 }
             }
         }

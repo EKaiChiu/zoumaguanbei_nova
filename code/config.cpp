@@ -16,7 +16,7 @@ void Data_Settings(void) // 参数赋值
     ImageStatus.Barn_Flag = 0;
     ImageStatus.straight_acc = 0;
 
-    ImageStatus.TowPoint = 25;          // 前瞻（提前看远，早减速）
+    ImageStatus.TowPoint = 20;          // 前瞻（提前看远，早减速）
     ImageStatus.OFFLine = 3;            // 起始行（更早开始检测）
     ImageStatus.Threshold_static = 50;  // 静态阈值
     ImageStatus.Threshold_detach = 150; // 阳光算法
