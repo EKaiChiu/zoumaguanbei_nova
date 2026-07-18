@@ -47,14 +47,21 @@
 #include "menu.hpp"
 #include "Tof.hpp"
 #include "StartLine.hpp"
+#include "Key.hpp"
+#include "motor.hpp"
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
 // ====================== 全局宏定义 ======================
 #define SERVER_IP "10.18.55.68"
 #define VISION_TIMER_PERIOD_MS 50
+#define PID_TUNE_ONLY 0  // 1: 上电只做电机PID调试，屏蔽巡线/视觉/停车线/菜单发车
 
 // ====================== 网络配置宏定义 ======================
 #define PORT 8086
 #define IMAGE_TRANSFER_INTERVAL 3
 #define IMAGE_TRANSFER_DEFAULT_STATE IMAGE_TRANSFER_OFF
+#define OSCILLOSCOPE_ENABLE 1
 
 // #define DEBUG_PRINT
 
@@ -156,6 +163,58 @@ static uint32 read_wrapper(uint8 *buff, uint32 length)
     return g_tcp_client ? g_tcp_client->read_data(buff, length) : 0;
 }
 
+static void pid_tune_stdin_init()
+{
+    int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
+    if (flags >= 0)
+        fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
+    printf("[MODE6] serial commands:\r\n");
+    printf("  pid kp ki kd ff min_pwm target_speed\r\n");
+    printf("  pidlr Lkp Lki Lkd Lff Lmin Rkp Rki Rkd Rff Rmin target_speed\r\n");
+}
+
+static void pid_tune_poll_stdin()
+{
+    static char line[160];
+    static int pos = 0;
+    char ch;
+    while (read(STDIN_FILENO, &ch, 1) == 1)
+    {
+        if (ch == '\r' || ch == '\n')
+        {
+            line[pos] = '\0';
+            pos = 0;
+            float kp, ki, kd, ff;
+            int min_pwm, target;
+            float kp_l, ki_l, kd_l, ff_l, kp_r, ki_r, kd_r, ff_r;
+            int min_l, min_r;
+
+            if (sscanf(line, "pidlr %f %f %f %f %d %f %f %f %f %d %d",
+                       &kp_l, &ki_l, &kd_l, &ff_l, &min_l,
+                       &kp_r, &ki_r, &kd_r, &ff_r, &min_r, &target) == 11)
+            {
+                motor_mode6_set_lr_params(kp_l, ki_l, kd_l, ff_l, min_l,
+                                          kp_r, ki_r, kd_r, ff_r, min_r, target);
+                printf("[MODE6] accepted: %s\r\n", line);
+            }
+            else if (sscanf(line, "pid %f %f %f %f %d %d", &kp, &ki, &kd, &ff, &min_pwm, &target) == 6)
+            {
+                motor_mode6_set_lr_params(kp, ki, kd, ff, min_pwm,
+                                          kp, ki, kd, ff, min_pwm, target);
+                printf("[MODE6] accepted: %s\r\n", line);
+            }
+            else if (line[0] != '\0')
+            {
+                printf("[MODE6] bad command. use pid or pidlr format.\r\n");
+            }
+        }
+        else if (pos < (int)sizeof(line) - 1)
+        {
+            line[pos++] = ch;
+        }
+    }
+}
+
 // **************************** 主函数入口 ****************************
 int main()
 {
@@ -175,20 +234,29 @@ int main()
     // ====================== 2. TCP网络初始化 ======================
     zf_driver_tcp_client tcp_client;
 
-    if (image_transfer_state == IMAGE_TRANSFER_INIT)
+    if (image_transfer_state == IMAGE_TRANSFER_INIT || OSCILLOSCOPE_ENABLE)
     {
         g_tcp_client = &tcp_client;
         if (tcp_client.init(SERVER_IP, PORT) == 0)
         {
             tcp_client.set_retry_param(1, 1);
-            image_transfer_state = IMAGE_TRANSFER_RUNNING;
-            printf("[IMAGE] transfer running\r\n");
+            if (image_transfer_state == IMAGE_TRANSFER_INIT)
+            {
+                image_transfer_state = IMAGE_TRANSFER_RUNNING;
+                printf("[IMAGE] transfer running\r\n");
+            }
+            else
+            {
+                image_transfer_state = IMAGE_TRANSFER_OFF;
+                printf("[OSC] transfer ready\r\n");
+            }
         }
         else
         {
             g_tcp_client = nullptr;
-            image_transfer_state = IMAGE_TRANSFER_ERROR;
-            printf("[IMAGE] transfer disabled: tcp init failed\r\n");
+            if (image_transfer_state == IMAGE_TRANSFER_INIT)
+                image_transfer_state = IMAGE_TRANSFER_ERROR;
+            printf("[OSC] transfer disabled: tcp init failed\r\n");
         }
 
         seekfree_assistant_interface_init(send_wrapper, read_wrapper);
@@ -285,21 +353,35 @@ int main()
         return -1;
     }
 
-    bool vision_ready = vision_init();
-    if (!vision_ready)
+#if PID_TUNE_ONLY
+    avoid_set_enabled(false);
+    printf("[PIDTUNE] standalone mode: line/vision/tof/startline/avoid/menu launch disabled.\r\n");
+#else
+    if (test_mode == 6)
     {
-        printf("[VISION] init failed, vision disabled.\r\n");
+        avoid_set_enabled(false);
+        printf("[MODE6] standalone mode: line/vision/tof/startline/avoid disabled.\r\n");
     }
     else
     {
-        vision_timer_ready = 1;
-        vision_timer.init_ms(VISION_TIMER_PERIOD_MS, VisionInterrupt);
-        printf("[VISION] timer enabled, period=%d ms\r\n", VISION_TIMER_PERIOD_MS);
-    }
+        bool vision_ready = vision_init();
+        if (!vision_ready)
+        {
+            printf("[VISION] init failed, vision disabled.\r\n");
+        }
+        else
+        {
+            vision_timer_ready = 1;
+            vision_timer.init_ms(VISION_TIMER_PERIOD_MS, VisionInterrupt);
+            printf("[VISION] timer enabled, period=%d ms\r\n", VISION_TIMER_PERIOD_MS);
+        }
 
-    tof_init();
+        tof_init();
+    }
+#endif
 
     printf("System init complete! Running...\r\n");
+    pid_tune_stdin_init();
 
     // ====================== 5. 主循环 ======================
     static int first_frame = 1; // 第一帧标记
@@ -314,9 +396,67 @@ int main()
             continue;
         }
 
+        pid_tune_poll_stdin();
+
+#if PID_TUNE_ONLY
+        if (first_frame)
+        {
+            first_frame = 0;
+            start_motor_timer();
+            start_car();
+            printf("[PIDTUNE] First frame OK, mode5 auto PID tuning started.\r\n");
+        }
+        continue;
+#endif
+
+        if (test_mode == 6)
+        {
+            if (first_frame)
+            {
+                first_frame = 0;
+                start_motor_timer();
+                printf("[MODE6] ready. KEY4 start/stop, KEY1 speed +10, KEY2 speed -10.\r\n");
+            }
+
+            Key_Process();
+            int key = Key_GetValueOnce();
+            if (!car_start_flag)
+            {
+                if (key == KEY_4)
+                {
+                    start_car();
+                    printf("[MODE6] KEY4 launch target=%d\r\n", motor_mode6_get_target());
+                }
+            }
+            else
+            {
+                if (key == KEY_1)
+                    motor_mode6_adjust_target(1);
+                else if (key == KEY_2)
+                    motor_mode6_adjust_target(-1);
+                else if (key == KEY_4)
+                {
+                    stop_car();
+                    printf("[MODE6] KEY4 stop\r\n");
+                }
+            }
+
+#if OSCILLOSCOPE_ENABLE
+            if (g_tcp_client != nullptr && car_start_flag)
+                motor_oscilloscope_send();
+#endif
+            continue;
+        }
+
         ImageProcess();
         tof_update();
+
         Menu_Process();
+
+#if OSCILLOSCOPE_ENABLE
+        if (g_tcp_client != nullptr && car_start_flag)
+            motor_oscilloscope_send();
+#endif
 
         int beep_request = vision_beep_request;
         if (beep_request > 0)

@@ -4,6 +4,7 @@
 #include "motor.hpp"
 #include "MyFlash.hpp"
 #include "avoid.hpp"
+#include "beep.hpp"
 #include "ips200_draw.hpp"
 #include "StartLine.hpp"
 #include "Test.hpp"
@@ -11,7 +12,7 @@
 #define MENU_TOP_COUNT 4
 #define MOTOR_ITEM_COUNT MOTOR_SPEED_PARAM_COUNT
 #define PID_ITEM_COUNT MOTOR_TURN_PARAM_COUNT
-#define TEST_ITEM_COUNT 5
+#define TEST_ITEM_COUNT 6
 #define BASE_SPEED_STEP 5
 #define TOWPOINT_STEP 1
 #define STARTLINE_TARGET_STEP 1
@@ -274,8 +275,10 @@ void Menu_Process(void)
                     startline_set_stop_target(startline_get_stop_target() + STARTLINE_TARGET_STEP);
                 else if (test_index == 3)
                     test_adjust_param(TEST_PARAM_YAW_PRINT, 1);
-                else
-                    avoid_set_enabled(true);
+                  else if (test_index == 4)
+                      avoid_set_enabled(true);
+                  else
+                      beep_set_enabled(1);
             }
             else if (key == KEY_2)
             {
@@ -287,16 +290,19 @@ void Menu_Process(void)
                     startline_set_stop_target(startline_get_stop_target() - STARTLINE_TARGET_STEP);
                 else if (test_index == 3)
                     test_adjust_param(TEST_PARAM_YAW_PRINT, -1);
-                else
-                    avoid_set_enabled(false);
+                  else if (test_index == 4)
+                      avoid_set_enabled(false);
+                  else
+                      beep_set_enabled(0);
             }
             else if (key == KEY_4)
             {
                 MyFlash_SaveParameters();
                 towpoint_selected = false;
-                printf("[MENU] test saved tow=%d/%d startline=%d yaw=%d avoid=%d\r\n",
-                       towpoint_get_up_row(), towpoint_get_down_row(), startline_get_stop_target(),
-                       test_get_yaw_print_enabled() ? 1 : 0, avoid_is_enabled() ? 1 : 0);
+                  printf("[MENU] test saved tow=%d/%d startline=%d yaw=%d avoid=%d beep=%d\r\n",
+                         towpoint_get_up_row(), towpoint_get_down_row(), startline_get_stop_target(),
+                         test_get_yaw_print_enabled() ? 1 : 0, avoid_is_enabled() ? 1 : 0,
+                         beep_is_enabled() ? 1 : 0);
             }
         }
         else
@@ -394,17 +400,19 @@ void Menu_Draw(void)
     {
         ips200.show_string(0, 0, "TEST MENU");
         ips200.show_string(0, 16, towpoint_selected ? "K1+ K2- K4SAVE" : "K1/K2 K3 SEL");
-        ips200.show_string(12, 36, test_index == 0 ? ">TowUp" : " TowUp");
-        ips200.show_int(104, 36, towpoint_get_up_row(), 2);
-        ips200.show_string(12, 52, test_index == 1 ? ">TowDown" : " TowDown");
-        ips200.show_int(104, 52, towpoint_get_down_row(), 2);
-        ips200.show_string(12, 68, test_index == 2 ? ">StopCnt" : " StopCnt");
-        ips200.show_int(104, 68, startline_get_stop_target(), 2);
-        ips200.show_string(12, 84, test_index == 3 ? ">YawPrn" : " YawPrn");
-        ips200.show_int(104, 84, test_get_yaw_print_enabled() ? 1 : 0, 1);
-        ips200.show_string(12, 100, test_index == 4 ? ">AvoidEn" : " AvoidEn");
-        ips200.show_int(104, 100, avoid_is_enabled() ? 1 : 0, 1);
-        if (towpoint_selected)
-            draw_red_marker(0, test_index == 0 ? 38 : (test_index == 1 ? 54 : (test_index == 2 ? 70 : (test_index == 3 ? 86 : 102))));
+        ips200.show_string(12, 32, test_index == 0 ? ">TowUp" : " TowUp");
+        ips200.show_int(104, 32, towpoint_get_up_row(), 2);
+        ips200.show_string(12, 46, test_index == 1 ? ">TowDown" : " TowDown");
+        ips200.show_int(104, 46, towpoint_get_down_row(), 2);
+        ips200.show_string(12, 60, test_index == 2 ? ">StopCnt" : " StopCnt");
+        ips200.show_int(104, 60, startline_get_stop_target(), 2);
+        ips200.show_string(12, 74, test_index == 3 ? ">YawPrn" : " YawPrn");
+        ips200.show_int(104, 74, test_get_yaw_print_enabled() ? 1 : 0, 1);
+        ips200.show_string(12, 88, test_index == 4 ? ">AvoidEn" : " AvoidEn");
+        ips200.show_int(104, 88, avoid_is_enabled() ? 1 : 0, 1);
+          ips200.show_string(12, 102, test_index == 5 ? ">BeepEn" : " BeepEn");
+          ips200.show_int(104, 102, beep_is_enabled() ? 1 : 0, 1);
+          if (towpoint_selected)
+              draw_red_marker(0, test_index == 0 ? 34 : (test_index == 1 ? 48 : (test_index == 2 ? 62 : (test_index == 3 ? 76 : (test_index == 4 ? 90 : 104)))));
     }
 }

@@ -33,7 +33,7 @@ float speed_integral_r;
 float speed_last_error_r;
 static float speed_dout_filtered_r = 1.0f;
 
-// 测试模式：0=寻迹, 1=速度测试, 2=固定PWM, 3=编码器观察, 4=映射验证
+// 测试模式：0=寻迹, 1=速度测试, 2=固定PWM, 3=编码器观察, 4=映射验证, 6=手动PID调速
 int test_mode = 0;
 int mode2_pwm = 1200;
 
@@ -52,6 +52,7 @@ static float turn_kp_big = 6.0f;
 static float turn_kp_sharp = 8.0f;
 static float turn_ring_multiplier = 1.50f;
 static int sharp_turn_print_cnt = 0;
+static bool uphill_boost_allowed = false;
 float k = 2.868;
 float dif = 0;
 
@@ -62,10 +63,10 @@ float y, x;
 int test_wheel = 1;  // 测试轮选择
 int test_speed = 60; // 测试目标速度
 
-int speed_pwm_min_l = 750;
-int speed_pwm_min_r = 725;
-float speed_pwm_feedforward_l = 10.6f;
-float speed_pwm_feedforward_r = 10.3f;
+int speed_pwm_min_l = 780;
+int speed_pwm_min_r = 780;
+float speed_pwm_feedforward_l = 6.2f;
+float speed_pwm_feedforward_r = 5.8f;
 static int line_base_speed = 160;
 static float speed_ratio_ring = 0.90f;
 static float speed_ratio_small = 0.80f;
@@ -107,8 +108,8 @@ void motor_set_line_base_speed(int speed)
 {
     if (speed < 45)
         speed = 45;
-    if (speed > 260)
-        speed = 260;
+    if (speed > 350)
+        speed = 350;
     line_base_speed = speed;
 }
 
@@ -360,18 +361,221 @@ void motor_argument()
     diff_speedl_expect = (int16)speed_goal_l;
     diff_speedr_expect = (int16)speed_goal_r;
 
-    // ✅ 低速PID参数（Kp=8.0确保pwm能达到800启动）
-    speed_p_l = 0.35f;
-    speed_i_l = 0.020f;
-    speed_d_l = 0.0f;
+    // 速度环 PID：模式5实车扫描得到的巡线中高速折中参数（候选6）。
+    speed_p_l = 0.340f;
+    speed_i_l = 0.008f;
+    speed_d_l = 0.180f;
 
-    speed_p_r = 0.35f;
-    speed_i_r = 0.020f;
-    speed_d_r = 0.0f;
+    speed_p_r = 0.260f;
+    speed_i_r = 0.006f;
+    speed_d_r = 0.080f;
 }
 
 // 临时诊断函数声明（调试完后删除！）
 void debug_print_centers();
+
+typedef struct
+{
+    float sum_speed;
+    float sum_error;
+    float sum_abs_error;
+    float max_speed;
+    float max_abs_error;
+    float last_error;
+    int sign_changes;
+    int samples;
+} SpeedTuneStats;
+
+static volatile int mode5_manual_pending = 0;
+static int mode5_manual_mode = 0;
+static int mode5_auto_done = 0;
+static float mode5_cmd_kp_l = 0.25f;
+static float mode5_cmd_ki_l = 0.004f;
+static float mode5_cmd_kd_l = 0.35f;
+static float mode5_cmd_ff_l = 7.0f;
+static int mode5_cmd_min_l = 1250;
+static float mode5_cmd_kp_r = 0.25f;
+static float mode5_cmd_ki_r = 0.004f;
+static float mode5_cmd_kd_r = 0.35f;
+static float mode5_cmd_ff_r = 7.0f;
+static int mode5_cmd_min_r = 1250;
+static int mode5_cmd_target = 160;
+
+static float mode5_best_score_l = 999999.0f;
+static float mode5_best_score_r = 999999.0f;
+static float mode5_best_kp_l = 0.25f, mode5_best_ki_l = 0.004f, mode5_best_kd_l = 0.35f, mode5_best_ff_l = 7.0f;
+static int mode5_best_min_l = 1250;
+static float mode5_best_kp_r = 0.25f, mode5_best_ki_r = 0.004f, mode5_best_kd_r = 0.35f, mode5_best_ff_r = 7.0f;
+static int mode5_best_min_r = 1250;
+
+static void mode5_apply_manual_command()
+{
+    speed_p_l = clamp_float(mode5_cmd_kp_l, 0.0f, 5.0f);
+    speed_i_l = clamp_float(mode5_cmd_ki_l, 0.0f, 0.20f);
+    speed_d_l = clamp_float(mode5_cmd_kd_l, 0.0f, 1.00f);
+    speed_pwm_feedforward_l = clamp_float(mode5_cmd_ff_l, 0.0f, 30.0f);
+    speed_pwm_min_l = (int)clamp_float((float)mode5_cmd_min_l, 0.0f, 2500.0f);
+
+    speed_p_r = clamp_float(mode5_cmd_kp_r, 0.0f, 5.0f);
+    speed_i_r = clamp_float(mode5_cmd_ki_r, 0.0f, 0.20f);
+    speed_d_r = clamp_float(mode5_cmd_kd_r, 0.0f, 1.00f);
+    speed_pwm_feedforward_r = clamp_float(mode5_cmd_ff_r, 0.0f, 30.0f);
+    speed_pwm_min_r = (int)clamp_float((float)mode5_cmd_min_r, 0.0f, 2500.0f);
+    test_speed = (int)clamp_float((float)mode5_cmd_target, 70.0f, 280.0f);
+}
+
+void mode5_set_manual_params(float kp, float ki, float kd, float feedforward, int min_pwm, int target_speed)
+{
+    mode5_cmd_kp_l = kp;
+    mode5_cmd_ki_l = ki;
+    mode5_cmd_kd_l = kd;
+    mode5_cmd_ff_l = feedforward;
+    mode5_cmd_min_l = min_pwm;
+    mode5_cmd_kp_r = kp;
+    mode5_cmd_ki_r = ki;
+    mode5_cmd_kd_r = kd;
+    mode5_cmd_ff_r = feedforward;
+    mode5_cmd_min_r = min_pwm;
+    mode5_cmd_target = target_speed;
+    mode5_manual_pending = 1;
+}
+
+void mode5_set_manual_lr_params(float kp_l, float ki_l, float kd_l, float ff_l, int min_l, float kp_r, float ki_r,
+                                float kd_r, float ff_r, int min_r, int target_speed)
+{
+    mode5_cmd_kp_l = kp_l;
+    mode5_cmd_ki_l = ki_l;
+    mode5_cmd_kd_l = kd_l;
+    mode5_cmd_ff_l = ff_l;
+    mode5_cmd_min_l = min_l;
+    mode5_cmd_kp_r = kp_r;
+    mode5_cmd_ki_r = ki_r;
+    mode5_cmd_kd_r = kd_r;
+    mode5_cmd_ff_r = ff_r;
+    mode5_cmd_min_r = min_r;
+    mode5_cmd_target = target_speed;
+    mode5_manual_pending = 1;
+}
+
+static void speed_tune_stats_reset(SpeedTuneStats *stats)
+{
+    stats->sum_speed = 0.0f;
+    stats->sum_error = 0.0f;
+    stats->sum_abs_error = 0.0f;
+    stats->max_speed = 0.0f;
+    stats->max_abs_error = 0.0f;
+    stats->last_error = 0.0f;
+    stats->sign_changes = 0;
+    stats->samples = 0;
+}
+
+static void speed_tune_stats_update(SpeedTuneStats *stats, float speed, float error)
+{
+    float abs_error = abs_float(error);
+
+    if (stats->samples > 0 &&
+        ((error > 0.0f && stats->last_error < 0.0f) || (error < 0.0f && stats->last_error > 0.0f)))
+    {
+        stats->sign_changes++;
+    }
+
+    stats->last_error = error;
+    stats->sum_speed += speed;
+    stats->sum_error += error;
+    stats->sum_abs_error += abs_error;
+    if (speed > stats->max_speed)
+        stats->max_speed = speed;
+    if (abs_error > stats->max_abs_error)
+        stats->max_abs_error = abs_error;
+    stats->samples++;
+}
+
+static void speed_tune_one_side(float target, float avg_speed, float avg_error, float avg_abs_error, float max_speed,
+                                int sign_changes, float *kp, float *ki, float *kd, float *feedforward, int *min_pwm)
+{
+    float abs_target = abs_float(target);
+    float overshoot = 0.0f;
+    if (abs_target > 1.0f)
+        overshoot = (max_speed - abs_target) / abs_target;
+
+    if (avg_speed < abs_target * 0.75f)
+    {
+        *min_pwm += 50;
+        *feedforward += 0.45f;
+        *kp += 0.08f;
+    }
+    else if (avg_error > abs_target * 0.10f)
+    {
+        *feedforward += 0.20f;
+        *ki += 0.003f;
+        *kp += 0.03f;
+    }
+    else if (avg_error < -abs_target * 0.10f)
+    {
+        *feedforward -= 0.20f;
+        *ki -= 0.002f;
+    }
+
+    if (sign_changes > 5 || overshoot > 0.25f)
+    {
+        *kp *= 0.88f;
+        *kd += 0.02f;
+        *min_pwm -= 25;
+    }
+    else if (avg_abs_error > abs_target * 0.12f)
+    {
+        *kp += 0.04f;
+    }
+
+    *kp = clamp_float(*kp, 0.20f, 3.50f);
+    *ki = clamp_float(*ki, 0.005f, 0.080f);
+    *kd = clamp_float(*kd, 0.0f, 0.45f);
+    *feedforward = clamp_float(*feedforward, 5.0f, 22.0f);
+    *min_pwm = (int)clamp_float((float)(*min_pwm), 700.0f, 1800.0f);
+}
+
+static int mode6_target_speed = 120;
+static int mode6_print_cnt = 0;
+
+void motor_mode6_set_lr_params(float kp_l, float ki_l, float kd_l, float ff_l, int min_l, float kp_r, float ki_r,
+                               float kd_r, float ff_r, int min_r, int target_speed)
+{
+    speed_p_l = clamp_float(kp_l, 0.0f, 5.0f);
+    speed_i_l = clamp_float(ki_l, 0.0f, 0.20f);
+    speed_d_l = clamp_float(kd_l, 0.0f, 1.00f);
+    speed_pwm_feedforward_l = clamp_float(ff_l, 0.0f, 30.0f);
+    speed_pwm_min_l = (int)clamp_float((float)min_l, 0.0f, 2500.0f);
+
+    speed_p_r = clamp_float(kp_r, 0.0f, 5.0f);
+    speed_i_r = clamp_float(ki_r, 0.0f, 0.20f);
+    speed_d_r = clamp_float(kd_r, 0.0f, 1.00f);
+    speed_pwm_feedforward_r = clamp_float(ff_r, 0.0f, 30.0f);
+    speed_pwm_min_r = (int)clamp_float((float)min_r, 0.0f, 2500.0f);
+
+    mode6_target_speed = (int)clamp_float((float)target_speed, 0.0f, 320.0f);
+    reset_speed_pid_state();
+    printf("[MODE6][PID] L kp=%.3f ki=%.4f kd=%.3f ff=%.1f min=%d | R kp=%.3f ki=%.4f kd=%.3f ff=%.1f min=%d "
+           "target=%d\r\n",
+           speed_p_l, speed_i_l, speed_d_l, speed_pwm_feedforward_l, speed_pwm_min_l, speed_p_r, speed_i_r, speed_d_r,
+           speed_pwm_feedforward_r, speed_pwm_min_r, mode6_target_speed);
+}
+
+void motor_mode6_adjust_target(int direction)
+{
+    int step = 10;
+    mode6_target_speed += direction * step;
+    if (mode6_target_speed < 0)
+        mode6_target_speed = 0;
+    if (mode6_target_speed > 320)
+        mode6_target_speed = 320;
+    reset_speed_pid_state();
+    printf("[MODE6][KEY] target=%d\r\n", mode6_target_speed);
+}
+
+int motor_mode6_get_target(void)
+{
+    return mode6_target_speed;
+}
 
 void motor_control()
 {
@@ -387,6 +591,8 @@ void motor_control()
     // ════════════════════════════════════════════════
     encoderA_count = encoder_dir_2.get_count();  // 左轮Encoder2
     encoderB_count = -encoder_dir_1.get_count(); // 右轮Encoder1（取反）
+    int16 encoder_raw_l = encoderA_count;
+    int16 encoder_raw_r = encoderB_count;
 
     encoder_dir_2.clear_count(); // 清零！
     encoder_dir_1.clear_count(); // 清零！
@@ -470,187 +676,192 @@ void motor_control()
     // ════════════════════════════════════════════════
     if (test_mode == 5)
     {
+        struct Mode5Candidate
+        {
+            float kp_l, ki_l, kd_l, ff_l;
+            int min_l;
+            float kp_r, ki_r, kd_r, ff_r;
+            int min_r;
+        };
+
+        static const int target_table[] = {80, 120, 160, 200, 240, 200, 160, 120};
+        static const Mode5Candidate candidates[] = {
+            {0.22f, 0.008f, 0.45f, 6.2f, 700, 0.20f, 0.006f, 0.45f, 5.0f, 700},
+            {0.26f, 0.010f, 0.45f, 6.6f, 700, 0.20f, 0.008f, 0.45f, 5.2f, 700},
+            {0.30f, 0.012f, 0.45f, 7.0f, 725, 0.22f, 0.010f, 0.45f, 5.5f, 700},
+            {0.34f, 0.014f, 0.45f, 7.4f, 750, 0.24f, 0.012f, 0.45f, 5.8f, 725},
+            {0.38f, 0.016f, 0.45f, 7.8f, 775, 0.26f, 0.014f, 0.45f, 6.1f, 750},
+            {0.42f, 0.018f, 0.45f, 8.2f, 825, 0.30f, 0.016f, 0.45f, 6.5f, 800},
+            {0.48f, 0.020f, 0.45f, 8.8f, 900, 0.36f, 0.018f, 0.45f, 7.0f, 850},
+            {0.55f, 0.022f, 0.45f, 9.4f, 975, 0.42f, 0.020f, 0.45f, 7.6f, 900},
+        };
+        static const int target_count = (int)(sizeof(target_table) / sizeof(target_table[0]));
+        static const int candidate_count = (int)(sizeof(candidates) / sizeof(candidates[0]));
+
         static int started = 0;
-        static int cnt = 0;
-        static int sample_count = 0;
-        static int stable_windows = 0;
-        static int tune_locked = 0;
-        static int sign_changes_l = 0;
-        static int sign_changes_r = 0;
-        static float last_error_l = 0.0f;
-        static float last_error_r = 0.0f;
-        static float sum_error_l = 0.0f;
-        static float sum_error_r = 0.0f;
-        static float sum_abs_error_l = 0.0f;
-        static float sum_abs_error_r = 0.0f;
-        static float max_abs_error_l = 0.0f;
-        static float max_abs_error_r = 0.0f;
+        static int candidate_index = 0;
+        static int target_index = 0;
+        static int settle_tick = 0;
+        static int sample_tick = 0;
+        static int printed_header = 0;
+        static float candidate_score = 0.0f;
+        static SpeedTuneStats stats_l;
+        static SpeedTuneStats stats_r;
+
+        if (mode5_manual_pending)
+        {
+            mode5_apply_manual_command();
+            mode5_manual_pending = 0;
+            reset_speed_pid_state();
+            printf("[MODE5][MANUAL] L kp=%.3f ki=%.4f kd=%.3f ff=%.1f min=%d | R kp=%.3f ki=%.4f kd=%.3f ff=%.1f "
+                   "min=%d base=%d\r\n",
+                   speed_p_l, speed_i_l, speed_d_l, speed_pwm_feedforward_l, speed_pwm_min_l, speed_p_r, speed_i_r,
+                   speed_d_r, speed_pwm_feedforward_r, speed_pwm_min_r, test_speed);
+            diff_speedl_expect = test_speed;
+            diff_speedr_expect = test_speed;
+            speed_goal_l = (float)test_speed;
+            speed_goal_r = (float)test_speed;
+            motor_pid_left();
+            motor_pid_right();
+            return;
+        }
 
         if (!started)
         {
             reset_speed_pid_state();
-            diff_speedl_expect = test_speed;
-            diff_speedr_expect = test_speed;
-            speed_goal_l = (float)diff_speedl_expect;
-            speed_goal_r = (float)diff_speedr_expect;
-
-            speed_p_l = 0.9f;
-            speed_i_l = 0.02f;
-            speed_d_l = 0.08f;
-            speed_p_r = 0.9f;
-            speed_i_r = 0.02f;
-            speed_d_r = 0.08f;
-
-            cnt = 0;
-            sample_count = 0;
-            stable_windows = 0;
-            tune_locked = 0;
-            sign_changes_l = 0;
-            sign_changes_r = 0;
-            last_error_l = 0.0f;
-            last_error_r = 0.0f;
-            sum_error_l = 0.0f;
-            sum_error_r = 0.0f;
-            sum_abs_error_l = 0.0f;
-            sum_abs_error_r = 0.0f;
-            max_abs_error_l = 0.0f;
-            max_abs_error_r = 0.0f;
+            speed_tune_stats_reset(&stats_l);
+            speed_tune_stats_reset(&stats_r);
+            mode5_best_score_l = 999999.0f;
+            mode5_best_score_r = 999999.0f;
+            candidate_index = 0;
+            target_index = 0;
+            settle_tick = 0;
+            sample_tick = 0;
+            candidate_score = 0.0f;
+            printed_header = 0;
             started = 1;
+            mode5_auto_done = 0;
+            printf("[MODE5][SCAN] start grid scan: candidates=%d speeds=80/120/160/200/240/200/160/120. auto stop.\r\n",
+                   candidate_count);
+        }
+
+        if (mode5_auto_done)
+        {
+            motor1_pwm_1.set_duty(0);
+            motor2_pwm_2.set_duty(0);
+            return;
+        }
+
+        if (candidate_index >= candidate_count)
+        {
+            motor1_pwm_1.set_duty(0);
+            motor2_pwm_2.set_duty(0);
+            mode5_auto_done = 1;
+            extern volatile int car_start_flag;
+            car_start_flag = 0;
+            printf("[MODE5][BEST] L kp=%.3f ki=%.4f kd=%.3f ff=%.1f min=%d | R kp=%.3f ki=%.4f kd=%.3f ff=%.1f min=%d "
+                   "score=%.1f\r\n",
+                   mode5_best_kp_l, mode5_best_ki_l, mode5_best_kd_l, mode5_best_ff_l, mode5_best_min_l,
+                   mode5_best_kp_r, mode5_best_ki_r, mode5_best_kd_r, mode5_best_ff_r, mode5_best_min_r,
+                   mode5_best_score_l);
+            printf("[MODE5][DONE] motor stopped.\r\n");
+            return;
+        }
+
+        const Mode5Candidate &c = candidates[candidate_index];
+        speed_p_l = c.kp_l;
+        speed_i_l = c.ki_l;
+        speed_d_l = c.kd_l;
+        speed_pwm_feedforward_l = c.ff_l;
+        speed_pwm_min_l = c.min_l;
+        speed_p_r = c.kp_r;
+        speed_i_r = c.ki_r;
+        speed_d_r = c.kd_r;
+        speed_pwm_feedforward_r = c.ff_r;
+        speed_pwm_min_r = c.min_r;
+
+        int target_speed = target_table[target_index];
+        diff_speedl_expect = target_speed;
+        diff_speedr_expect = target_speed;
+        speed_goal_l = (float)target_speed;
+        speed_goal_r = (float)target_speed;
+
+        if (!printed_header)
+        {
+            printed_header = 1;
+            printf("[MODE5][SCAN] cand=%d/%d L %.3f %.4f %.3f ff=%.1f min=%d | R %.3f %.4f %.3f ff=%.1f min=%d\r\n",
+                   candidate_index + 1, candidate_count, c.kp_l, c.ki_l, c.kd_l, c.ff_l, c.min_l, c.kp_r, c.ki_r,
+                   c.kd_r, c.ff_r, c.min_r);
         }
 
         motor_pid_left();
         motor_pid_right();
 
-        float abs_error_l = abs_float(speed_error_l);
-        float abs_error_r = abs_float(speed_error_r);
-
-        if (sample_count > 0 &&
-            ((speed_error_l > 0.0f && last_error_l < 0.0f) || (speed_error_l < 0.0f && last_error_l > 0.0f)))
+        if (settle_tick < 30)
         {
-            sign_changes_l++;
-        }
-        if (sample_count > 0 &&
-            ((speed_error_r > 0.0f && last_error_r < 0.0f) || (speed_error_r < 0.0f && last_error_r > 0.0f)))
-        {
-            sign_changes_r++;
+            settle_tick++;
+            return;
         }
 
-        last_error_l = speed_error_l;
-        last_error_r = speed_error_r;
-        sum_error_l += speed_error_l;
-        sum_error_r += speed_error_r;
-        sum_abs_error_l += abs_error_l;
-        sum_abs_error_r += abs_error_r;
-        if (abs_error_l > max_abs_error_l)
-            max_abs_error_l = abs_error_l;
-        if (abs_error_r > max_abs_error_r)
-            max_abs_error_r = abs_error_r;
+        speed_tune_stats_update(&stats_l, (float)encoderA_count, speed_error_l);
+        speed_tune_stats_update(&stats_r, (float)encoderB_count, speed_error_r);
+        sample_tick++;
 
-        sample_count++;
-
-        if (++cnt % 25 == 0)
+        if (sample_tick >= 50)
         {
-            float avg_error_l = sum_error_l / (float)sample_count;
-            float avg_error_r = sum_error_r / (float)sample_count;
-            float avg_abs_error_l = sum_abs_error_l / (float)sample_count;
-            float avg_abs_error_r = sum_abs_error_r / (float)sample_count;
+            float avg_speed_l = stats_l.sum_speed / (float)stats_l.samples;
+            float avg_speed_r = stats_r.sum_speed / (float)stats_r.samples;
+            float avg_abs_error_l = stats_l.sum_abs_error / (float)stats_l.samples;
+            float avg_abs_error_r = stats_r.sum_abs_error / (float)stats_r.samples;
+            float abs_target = abs_float((float)target_speed);
+            float overshoot_l = (stats_l.max_speed - abs_target) / (abs_target + 1.0f);
+            float overshoot_r = (stats_r.max_speed - abs_target) / (abs_target + 1.0f);
+            if (overshoot_l < 0.0f)
+                overshoot_l = 0.0f;
+            if (overshoot_r < 0.0f)
+                overshoot_r = 0.0f;
+            float stop_penalty_l = (avg_speed_l < abs_target * 0.35f) ? 120.0f : 0.0f;
+            float stop_penalty_r = (avg_speed_r < abs_target * 0.35f) ? 120.0f : 0.0f;
+            float score = avg_abs_error_l + avg_abs_error_r + (overshoot_l + overshoot_r) * 55.0f +
+                          (float)(stats_l.sign_changes + stats_r.sign_changes) * 2.0f + stop_penalty_l + stop_penalty_r;
+            candidate_score += score;
 
-            int stable_l = (abs_float(avg_error_l) < 8.0f && avg_abs_error_l < 13.0f && max_abs_error_l < 85.0f);
-            int stable_r = (abs_float(avg_error_r) < 8.0f && avg_abs_error_r < 13.0f && max_abs_error_r < 85.0f);
+            printf("[MODE5][SCAN] cand=%d speed=%d L avg=%.1f abs=%.1f max=%.1f sc=%d | R avg=%.1f abs=%.1f max=%.1f "
+                   "sc=%d score=%.1f total=%.1f\r\n",
+                   candidate_index + 1, target_speed, avg_speed_l, avg_abs_error_l, stats_l.max_speed,
+                   stats_l.sign_changes, avg_speed_r, avg_abs_error_r, stats_r.max_speed, stats_r.sign_changes, score,
+                   candidate_score);
 
-            if (!tune_locked && stable_l && stable_r)
-                stable_windows++;
-            else if (!tune_locked && stable_windows > 0)
-                stable_windows--;
+            target_index++;
+            settle_tick = 0;
+            sample_tick = 0;
+            speed_tune_stats_reset(&stats_l);
+            speed_tune_stats_reset(&stats_r);
+            reset_speed_pid_state();
 
-            if (!tune_locked && stable_windows >= 3)
+            if (target_index >= target_count)
             {
-                tune_locked = 1;
-                reset_speed_pid_state();
+                printf("[MODE5][SCAN] cand=%d total_score=%.1f\r\n", candidate_index + 1, candidate_score);
+                if (candidate_score < mode5_best_score_l)
+                {
+                    mode5_best_score_l = candidate_score;
+                    mode5_best_kp_l = c.kp_l;
+                    mode5_best_ki_l = c.ki_l;
+                    mode5_best_kd_l = c.kd_l;
+                    mode5_best_ff_l = c.ff_l;
+                    mode5_best_min_l = c.min_l;
+                    mode5_best_kp_r = c.kp_r;
+                    mode5_best_ki_r = c.ki_r;
+                    mode5_best_kd_r = c.kd_r;
+                    mode5_best_ff_r = c.ff_r;
+                    mode5_best_min_r = c.min_r;
+                    printf("[MODE5][SCAN] new best cand=%d score=%.1f\r\n", candidate_index + 1, candidate_score);
+                }
+                candidate_index++;
+                target_index = 0;
+                candidate_score = 0.0f;
+                printed_header = 0;
             }
-
-            if (tune_locked && avg_error_l > 6.0f)
-            {
-                speed_pwm_min_l += 10;
-                speed_pwm_feedforward_l = clamp_float(speed_pwm_feedforward_l + 0.1f, 4.0f, 24.0f);
-                reset_speed_pid_state();
-            }
-            else if (tune_locked && avg_error_l < -6.0f)
-            {
-                speed_pwm_min_l -= 10;
-                speed_pwm_feedforward_l = clamp_float(speed_pwm_feedforward_l - 0.1f, 4.0f, 24.0f);
-                reset_speed_pid_state();
-            }
-
-            if (tune_locked && avg_error_r > 6.0f)
-            {
-                speed_pwm_min_r += 10;
-                speed_pwm_feedforward_r = clamp_float(speed_pwm_feedforward_r + 0.1f, 4.0f, 24.0f);
-                reset_speed_pid_state();
-            }
-            else if (tune_locked && avg_error_r < -6.0f)
-            {
-                speed_pwm_min_r -= 10;
-                speed_pwm_feedforward_r = clamp_float(speed_pwm_feedforward_r - 0.1f, 4.0f, 24.0f);
-                reset_speed_pid_state();
-            }
-
-            if (!tune_locked && avg_error_l > 6.0f)
-            {
-                speed_pwm_min_l += 25;
-                speed_pwm_feedforward_l = clamp_float(speed_pwm_feedforward_l + 0.3f, 4.0f, 24.0f);
-            }
-            else if (!tune_locked && avg_error_l < -6.0f)
-            {
-                speed_pwm_min_l -= 25;
-                speed_pwm_feedforward_l = clamp_float(speed_pwm_feedforward_l - 0.3f, 4.0f, 24.0f);
-            }
-
-            if (!tune_locked && avg_error_r > 6.0f)
-            {
-                speed_pwm_min_r += 25;
-                speed_pwm_feedforward_r = clamp_float(speed_pwm_feedforward_r + 0.3f, 4.0f, 24.0f);
-            }
-            else if (!tune_locked && avg_error_r < -6.0f)
-            {
-                speed_pwm_min_r -= 25;
-                speed_pwm_feedforward_r = clamp_float(speed_pwm_feedforward_r - 0.3f, 4.0f, 24.0f);
-            }
-
-            speed_pwm_min_l = (int)clamp_float((float)speed_pwm_min_l, 450.0f, 1300.0f);
-            speed_pwm_min_r = (int)clamp_float((float)speed_pwm_min_r, 450.0f, 1300.0f);
-
-            if (!tune_locked && (sign_changes_l > 6 || max_abs_error_l > 80.0f))
-            {
-                speed_p_l = clamp_float(speed_p_l * 0.9f, 0.35f, 4.0f);
-                speed_d_l = clamp_float(speed_d_l * 0.85f, 0.0f, 1.2f);
-            }
-            else if (!tune_locked && avg_abs_error_l > 12.0f && sign_changes_l <= 3)
-            {
-                speed_p_l = clamp_float(speed_p_l + 0.08f, 0.35f, 4.0f);
-                speed_d_l = clamp_float(speed_d_l + 0.02f, 0.0f, 1.2f);
-            }
-
-            if (!tune_locked && (sign_changes_r > 6 || max_abs_error_r > 80.0f))
-            {
-                speed_p_r = clamp_float(speed_p_r * 0.9f, 0.35f, 4.0f);
-                speed_d_r = clamp_float(speed_d_r * 0.85f, 0.0f, 1.2f);
-            }
-            else if (!tune_locked && avg_abs_error_r > 12.0f && sign_changes_r <= 3)
-            {
-                speed_p_r = clamp_float(speed_p_r + 0.08f, 0.35f, 4.0f);
-                speed_d_r = clamp_float(speed_d_r + 0.02f, 0.0f, 1.2f);
-            }
-
-            sample_count = 0;
-            sign_changes_l = 0;
-            sign_changes_r = 0;
-            sum_error_l = 0.0f;
-            sum_error_r = 0.0f;
-            sum_abs_error_l = 0.0f;
-            sum_abs_error_r = 0.0f;
-            max_abs_error_l = 0.0f;
-            max_abs_error_r = 0.0f;
         }
 
         return;
@@ -658,26 +869,38 @@ void motor_control()
 
     if (test_mode == 3)
     {
-        static int started = 0;
+        static int print_cnt = 0;
 
-        if (!started)
+        motor1_pwm_1.set_duty(0);
+        motor2_pwm_2.set_duty(0);
+
+        if (++print_cnt >= 5)
         {
-            reset_speed_pid_state();
-            started = 1;
-
-            // 在这里调整PID参数
-            speed_p_l = 1.2f;
-            speed_i_l = 0.05f;
-            speed_d_l = 0.8f;
-            speed_p_r = 1.2f;
-            speed_i_r = 0.05f;
-            speed_d_r = 0.8f;
-
-            setup_speed_test_target();
+            print_cnt = 0;
+            printf("[MODE3][ENC] rawL(e2)=%d rawR(-e1)=%d | mapL=%d mapR=%d\r\n", encoder_raw_l, encoder_raw_r,
+                   encoderA_count, encoderB_count);
         }
+        return;
+    }
 
+    // ════════════════════════════════════════════════
+    // 模式6：手动PID调速。串口输入参数，KEY1加速，KEY2减速。
+    // ════════════════════════════════════════════════
+    if (test_mode == 6)
+    {
+        diff_speedl_expect = (int16)mode6_target_speed;
+        diff_speedr_expect = (int16)mode6_target_speed;
+        speed_goal_l = (float)diff_speedl_expect;
+        speed_goal_r = (float)diff_speedr_expect;
         motor_pid_left();
         motor_pid_right();
+
+        if (++mode6_print_cnt >= 5)
+        {
+            mode6_print_cnt = 0;
+            printf("[MODE6] target=%d L=%d err=%.1f pwm=%.1f | R=%d err=%.1f pwm=%.1f\r\n", mode6_target_speed,
+                   encoderA_count, speed_error_l, speed_pid_out_l, encoderB_count, speed_error_r, speed_pid_out_r);
+        }
         return;
     }
 
@@ -689,6 +912,17 @@ void motor_control()
     speed_goal_r = (float)diff_speedr_expect;
     motor_pid_left();  // 左轮PID
     motor_pid_right(); // 右轮PID
+}
+
+void motor_oscilloscope_send()
+{
+    // 逐飞助手虚拟示波器：0左目标 1左实际 2右目标 3右实际。
+    seekfree_assistant_oscilloscope_data.channel_num = 4;
+    seekfree_assistant_oscilloscope_data.data[0] = speed_goal_l;
+    seekfree_assistant_oscilloscope_data.data[1] = (float)encoderA_count;
+    seekfree_assistant_oscilloscope_data.data[2] = speed_goal_r;
+    seekfree_assistant_oscilloscope_data.data[3] = (float)encoderB_count;
+    seekfree_assistant_oscilloscope_send(&seekfree_assistant_oscilloscope_data);
 }
 
 void motor_init()
@@ -707,8 +941,46 @@ void debug_print_centers()
 {
 }
 
+static int calc_uphill_pwm_boost(float goal, float actual, int *low_speed_count)
+{
+    float abs_goal = abs_float(goal);
+    float abs_actual = abs_float(actual);
+
+    // 只在直线/小偏差时允许爬坡补偿；一进弯就立刻清掉，避免下坡进弯继续加力。
+    if (!uphill_boost_allowed || abs_goal < 80.0f)
+    {
+        *low_speed_count = 0;
+        return 0;
+    }
+
+    bool speed_too_low = abs_actual < abs_goal * 0.55f;
+    bool same_direction = (goal * actual) >= 0.0f || abs_actual < 5.0f;
+
+    if (speed_too_low && same_direction)
+    {
+        if (*low_speed_count < 30)
+            (*low_speed_count)++;
+    }
+    else
+    {
+        *low_speed_count = 0;
+        return 0;
+    }
+
+    if (*low_speed_count < 3)
+        return 0;
+
+    int boost = 200 + (*low_speed_count - 3) * 20;
+    if (boost > 650)
+        boost = 650;
+
+    return goal > 0.0f ? boost : -boost;
+}
+
 void motor_pid_left()
 {
+    static int low_speed_count_l = 0;
+
     // encoderA_count 已是本周期增量（pulse/周期）
     float actual_speed = (float)encoderA_count; // 当前速度估计
 
@@ -719,10 +991,10 @@ void motor_pid_left()
 
     // I 项（关键：限幅要小！）
     speed_integral_l += speed_i_l * speed_error_l;
-    if (speed_integral_l > 50.0f)
-        speed_integral_l = 50.0f;
-    if (speed_integral_l < -50.0f)
-        speed_integral_l = -50.0f;
+    if (speed_integral_l > 350.0f)
+        speed_integral_l = 350.0f;
+    if (speed_integral_l < -350.0f)
+        speed_integral_l = -350.0f;
 
     // D 项（加滤波防噪声）
     float dout_raw = speed_d_l * (speed_error_l - speed_last_error_l);
@@ -740,6 +1012,7 @@ void motor_pid_left()
 
     // 左轮输出
     int final_pwm_l = (int)(speed_goal_l * speed_pwm_feedforward_l + speed_pid_out_l);
+    final_pwm_l += calc_uphill_pwm_boost(speed_goal_l, actual_speed, &low_speed_count_l);
     if (final_pwm_l > pwm_max)
         final_pwm_l = pwm_max;
     if (final_pwm_l < pwm_min)
@@ -775,6 +1048,8 @@ void motor_pid_left()
 
 void motor_pid_right()
 {
+    static int low_speed_count_r = 0;
+
     // encoderB_count 已是本周期增量（pulse/周期）
     float actual_speed = (float)encoderB_count; // 当前速度估计
 
@@ -785,10 +1060,10 @@ void motor_pid_right()
 
     // I 项（关键：限幅要小！）
     speed_integral_r += speed_i_r * speed_error_r;
-    if (speed_integral_r > 50.0f)
-        speed_integral_r = 50.0f;
-    if (speed_integral_r < -50.0f)
-        speed_integral_r = -50.0f;
+    if (speed_integral_r > 350.0f)
+        speed_integral_r = 350.0f;
+    if (speed_integral_r < -350.0f)
+        speed_integral_r = -350.0f;
 
     // D 项（加滤波防噪声）
     float dout_raw = speed_d_r * (speed_error_r - speed_last_error_r);
@@ -806,6 +1081,7 @@ void motor_pid_right()
 
     // 右轮输出
     int final_pwm_r = (int)(speed_goal_r * speed_pwm_feedforward_r + speed_pid_out_r);
+    final_pwm_r += calc_uphill_pwm_boost(speed_goal_r, actual_speed, &low_speed_count_r);
     if (final_pwm_r > pwm_max)
         final_pwm_r = pwm_max;
     if (final_pwm_r < pwm_min)
@@ -855,7 +1131,10 @@ void motor_diff_pid1()
     }
 
     float abs_turn_error = abs_float(turn_error);
-    bool ring_turning = (ImageFlag.image_element_rings_flag >= 5 && ImageFlag.image_element_rings_flag <= 8);
+    bool ring_turning = (ImageFlag.image_element_rings_flag >= 1 && ImageFlag.image_element_rings_flag <= 8);
+    bool ring_detected = (ImageStatus.Road_type == LeftCirque || ImageStatus.Road_type == RightCirque ||
+                          ImageFlag.image_element_rings_flag != 0);
+    uphill_boost_allowed = (!ring_detected && abs_turn_error <= 3.0f);
     float current_kp = diff_kp;
     float current_kd = 0.20f;
     if (abs_turn_error <= 3.5f)
@@ -872,12 +1151,6 @@ void motor_diff_pid1()
     {
         current_kp = turn_kp_big; // stronger bend turn
         current_kd = 0.30f;
-        if (++sharp_turn_print_cnt >= 10)
-        {
-            sharp_turn_print_cnt = 0;
-            printf("[TURN] sharp err=%.1f kp=%.1f kd=%.2f det=%.1f target=%.1f\r\n", abs_turn_error, current_kp,
-                   current_kd, (float)ImageStatus.Det_True, target_center);
-        }
     }
     else
     {
@@ -894,7 +1167,7 @@ void motor_diff_pid1()
     last_turn_error = turn_error;
 
     // 转向限幅：允许急弯接近外侧正转、内侧反转，但避免D项尖峰过猛
-    float turn_limit = 520.0f;
+    float turn_limit = 650.0f;
     if (turn_output > turn_limit)
         turn_output = turn_limit;
     if (turn_output < -turn_limit)
@@ -906,14 +1179,14 @@ void motor_diff_pid1()
         filtered_turn_output = 0.0f;
     }
 
-    float max_turn_step = (abs_turn_error >= 8.0f) ? 220.0f : 70.0f;
+    float max_turn_step = (abs_turn_error >= 8.0f) ? 320.0f : 180.0f;
     float turn_delta = turn_output - filtered_turn_output;
     if (turn_delta > max_turn_step)
         turn_delta = max_turn_step;
     if (turn_delta < -max_turn_step)
         turn_delta = -max_turn_step;
     filtered_turn_output += turn_delta;
-    filtered_turn_output = 0.65f * filtered_turn_output + 0.35f * turn_output;
+    filtered_turn_output = 0.35f * filtered_turn_output + 0.65f * turn_output;
     if (abs_turn_error <= 3.0f)
     {
         filtered_turn_output *= 0.25f;
@@ -922,9 +1195,8 @@ void motor_diff_pid1()
     int current_base_speed = line_base_speed;
 
     // 环岛限速：只要进入环岛相关状态，就先按 Ring 倍率限制最高速度。
+
     // Ring/Small/Mid/Big/Sharp 都可以在 Speed 菜单里以 0.1 步长调整。
-    bool ring_detected = (ImageStatus.Road_type == LeftCirque || ImageStatus.Road_type == RightCirque ||
-                          ImageFlag.image_element_rings_flag != 0);
     int ring_speed_limit = (int)(line_base_speed * speed_ratio_ring);
     if (ring_detected && current_base_speed > ring_speed_limit)
         current_base_speed = ring_speed_limit;
@@ -933,11 +1205,8 @@ void motor_diff_pid1()
     if (ImageFlag.image_element_rings_flag == 1)
         current_base_speed -= 30;
 
-    // 普通弯道分档限速，按图像偏差 abs_turn_error 分为四档：
-    // 小弯  : 4.5 <= error < 8.0   -> base * Small
-    // 中弯  : 8.0 <= error < 12.0  -> base * Mid
-    // 大弯  : 12.0 <= error < 16.0 -> base * Big
-    // 急弯  : error >= 16.0        -> base * Sharp
+    // 普通弯道分档限速：保留一定速度，但避免入弯外轮猛加速导致转向半径过大。
+    // 小弯/中弯通常可保持全速；大弯/急弯按菜单倍率限制。
     if (abs_turn_error >= 16.0f)
     {
         int speed_limit = (int)(line_base_speed * speed_ratio_sharp);
@@ -967,9 +1236,26 @@ void motor_diff_pid1()
     if (current_base_speed < 45)
         current_base_speed = 45;
 
-    // 计算左右轮目标速度
-    diff_speedl_expect = current_base_speed + (int)filtered_turn_output;
-    diff_speedr_expect = current_base_speed - (int)filtered_turn_output;
+    // 计算左右轮目标速度。
+    // 弯道不要再用“外轮大幅加速 + 内轮减速”的对称差速，否则基础速度低时，
+    // 一进弯外轮仍会被推到很高，表现为弯道猛加速、转向半径变大。
+    int turn_cmd = (int)filtered_turn_output;
+    // 高速巡线折中：外轮适当加速保持过弯速度，内轮减速形成转向力矩。
+    // 大弯仍保留更多内轮减速，避免只提速不转向。
+    float outer_gain = (abs_turn_error >= 12.0f) ? 0.50f : 0.65f;
+    float inner_gain = (abs_turn_error >= 12.0f) ? 1.65f : 1.45f;
+
+    if (turn_cmd >= 0)
+    {
+        diff_speedl_expect = current_base_speed + (int)(turn_cmd * outer_gain);
+        diff_speedr_expect = current_base_speed - (int)(turn_cmd * inner_gain);
+    }
+    else
+    {
+        int turn_abs = -turn_cmd;
+        diff_speedl_expect = current_base_speed - (int)(turn_abs * inner_gain);
+        diff_speedr_expect = current_base_speed + (int)(turn_abs * outer_gain);
+    }
 
     // 极限保护：左右轮目标速度统一限制在 -Limit 到 +Limit。
     if (diff_speedl_expect < -speed_expect_limit)

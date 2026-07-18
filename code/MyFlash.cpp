@@ -1,6 +1,7 @@
 #include "MyFlash.hpp"
 
 #include "avoid.hpp"
+#include "beep.hpp"
 #include "ips200_draw.hpp"
 #include "motor.hpp"
 #include "StartLine.hpp"
@@ -17,6 +18,7 @@ static const char *FLASH_KEY_TOWPOINT_DOWN = "towpoint_down_row=";
 static const char *FLASH_KEY_STARTLINE_STOP_TARGET = "startline_stop_target=";
 static const char *FLASH_KEY_TEST_YAW_PRINT = "test_yaw_print=";
 static const char *FLASH_KEY_AVOID_ENABLED = "avoid_enabled=";
+static const char *FLASH_KEY_BEEP_ENABLED = "beep_enabled=";
 static const char *FLASH_KEY_SPEED_EXPECT_LIMIT = "speed_expect_limit=";
 static const char *FLASH_TURN_KEYS[MOTOR_TURN_PARAM_COUNT] = {
     "turn_low_kp=",
@@ -47,6 +49,7 @@ static bool flash_loaded_towpoint_down = false;
 static bool flash_loaded_startline_stop_target = false;
 static bool flash_loaded_test_yaw_print = false;
 static bool flash_loaded_avoid_enabled = false;
+static bool flash_loaded_beep_enabled = false;
 static bool flash_loaded_avoid_param[AVOID_PARAM_COUNT] = {false};
 static bool flash_loaded_speed_ratio[5] = {false};
 static bool flash_loaded_speed_expect_limit = false;
@@ -180,7 +183,7 @@ void MyFlash_Init(void)
     if (!flash_loaded_line_base_speed || !all_speed_ratios_loaded() || !flash_loaded_speed_expect_limit ||
         !all_turn_params_loaded() || !all_avoid_params_loaded() || !flash_loaded_avoid_enabled ||
         !flash_loaded_towpoint_up || !flash_loaded_towpoint_down ||
-        !flash_loaded_startline_stop_target || !flash_loaded_test_yaw_print)
+        !flash_loaded_startline_stop_target || !flash_loaded_test_yaw_print || !flash_loaded_beep_enabled)
     {
         MyFlash_SaveParameters();
     }
@@ -295,6 +298,14 @@ void MyFlash_LoadParameters(void)
             continue;
         }
 
+        if (parse_int_key(item, FLASH_KEY_BEEP_ENABLED, &int_value))
+        {
+            beep_set_enabled(int_value != 0);
+            flash_loaded_beep_enabled = true;
+            printf("[FLASH] load beep_enabled=%d\r\n", beep_is_enabled() ? 1 : 0);
+            continue;
+        }
+
         int avoid_index = 0;
         float avoid_value = 0.0f;
         if (parse_avoid_param(item, &avoid_index, &avoid_value))
@@ -327,6 +338,8 @@ void MyFlash_LoadParameters(void)
         printf("[FLASH] test_yaw_print default=%d\r\n", test_get_yaw_print_enabled() ? 1 : 0);
     if (!flash_loaded_avoid_enabled)
         printf("[FLASH] avoid_enabled default=%d\r\n", avoid_is_enabled() ? 1 : 0);
+    if (!flash_loaded_beep_enabled)
+        printf("[FLASH] beep_enabled default=%d\r\n", beep_is_enabled() ? 1 : 0);
 }
 
 void MyFlash_SaveParameters(void)
@@ -413,12 +426,19 @@ void MyFlash_SaveParameters(void)
     else
         flash_loaded_avoid_enabled = true;
 
+    snprintf(item, sizeof(item), "%s%d\r\n", FLASH_KEY_BEEP_ENABLED, beep_is_enabled() ? 1 : 0);
+    if (flash_file.write_string(item) != 0)
+        save_ok = false;
+    else
+        flash_loaded_beep_enabled = true;
+
     if (save_ok)
     {
-        printf("[FLASH] save base=%d limit=%d speed/pid ok avoid ok tow=%d/%d startline=%d yaw=%d avoid=%d\r\n",
+        printf("[FLASH] save base=%d limit=%d speed/pid ok avoid ok tow=%d/%d startline=%d yaw=%d avoid=%d beep=%d\r\n",
                motor_get_line_base_speed(), (int)motor_get_speed_param_value(6),
                towpoint_get_up_row(), towpoint_get_down_row(), startline_get_stop_target(),
-               test_get_yaw_print_enabled() ? 1 : 0, avoid_is_enabled() ? 1 : 0);
+               test_get_yaw_print_enabled() ? 1 : 0, avoid_is_enabled() ? 1 : 0,
+               beep_is_enabled() ? 1 : 0);
     }
     else
     {
