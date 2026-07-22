@@ -47,25 +47,24 @@
 #include "menu.hpp"
 #include "Tof.hpp"
 #include "StartLine.hpp"
+
+#define ENABLE_STARTLINE_STOP 0 // 斑马线停车开关：0关闭，1开启
 #include "Key.hpp"
 #include "motor.hpp"
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
 // ====================== 全局宏定义 ======================
-#define SERVER_IP "10.18.55.68"
+#define SERVER_IP "192.168.137.1"
 #define VISION_TIMER_PERIOD_MS 50
-#define PID_TUNE_ONLY 0  // 1: 上电只做电机PID调试，屏蔽巡线/视觉/停车线/菜单发车
+#define PID_TUNE_ONLY 0 // 1: 上电只做电机PID调试，屏蔽巡线/视觉/停车线/菜单发车
 
 // ====================== 网络配置宏定义 ======================
 #define PORT 8086
-#define IMAGE_TRANSFER_INTERVAL 3
-#define IMAGE_TRANSFER_DEFAULT_STATE IMAGE_TRANSFER_OFF
-#define OSCILLOSCOPE_ENABLE 1
+#define IMAGE_TRANSFER_INTERVAL 2
+#define IMAGE_TRANSFER_DEFAULT_STATE IMAGE_TRANSFER_INIT
 
 // #define DEBUG_PRINT
-
-
 
 // ======================清理退出函数======================
 void sigint_handler(int sig);
@@ -87,6 +86,7 @@ zf_driver_pit vision_timer;
 static volatile int latest_vision_result = -1;
 static volatile int vision_timer_ready = 0;
 static volatile int vision_task_busy = 0;
+static volatile int vision_request = 0;
 static volatile int vision_beep_request = 0;
 
 // ====================== TCP通信包装函数 ======================
@@ -100,8 +100,31 @@ enum image_transfer_state_t
     IMAGE_TRANSFER_ERROR,
 };
 
+static bool image_transfer_enabled = (IMAGE_TRANSFER_DEFAULT_STATE == IMAGE_TRANSFER_INIT);
 static image_transfer_state_t image_transfer_state = IMAGE_TRANSFER_DEFAULT_STATE;
 static int image_transfer_fail_count = 0;
+
+void image_transfer_set_enabled(bool enable)
+{
+    image_transfer_enabled = enable;
+    image_transfer_state = enable ? IMAGE_TRANSFER_INIT : IMAGE_TRANSFER_OFF;
+    image_transfer_fail_count = 0;
+}
+
+bool image_transfer_is_enabled(void)
+{
+    return image_transfer_enabled;
+}
+
+// IPS200显示状态机：屏幕拿走时保持 OFF，主循环不再刷新屏幕。
+enum screen_display_state_t
+{
+    SCREEN_DISPLAY_OFF = 0,
+    SCREEN_DISPLAY_MENU,
+    SCREEN_DISPLAY_RUNTIME,
+};
+
+static screen_display_state_t screen_display_state = SCREEN_DISPLAY_OFF;
 
 static void VisionInterrupt()
 {
@@ -112,31 +135,42 @@ static void VisionInterrupt()
     if (vision_task_busy)
         return;
 
-    vision_task_busy = 1;
-    uint16_t *rgb_image = uvc_cam.get_rgb_image_ptr();
-    if (rgb_image != nullptr)
-    {
-        int vision_result = vision_get_from_rgb565(rgb_image, UVC_WIDTH, UVC_HEIGHT);
-        latest_vision_result = vision_result;
+    // 定时器只发起识别请求，避免在中断里执行 OpenCV/ncnn 推理拖慢电机控制。
+    vision_request = 1;
+}
 
-        static bool vision_beep_latched = false;
-        if (vision_result >= 0 && vision_result <= 2)
+static void process_vision_request(uint16_t *rgb_image)
+{
+    if (!vision_request || vision_task_busy)
+        return;
+
+    vision_request = 0;
+    vision_task_busy = 1;
+
+    int vision_result = -1;
+    if (rgb_image != nullptr)
+        vision_result = vision_get_from_rgb565(rgb_image, UVC_WIDTH, UVC_HEIGHT);
+
+    latest_vision_result = vision_result;
+
+    static bool vision_beep_latched = false;
+    if (vision_result >= 0 && vision_result <= 2)
+    {
+        avoid_set_vision_result(vision_result);
+        const char *vision_name = (vision_result == 0) ? "武器" : ((vision_result == 1) ? "补给" : "车辆");
+        printf("vision_get() result: %s\n", vision_name);
+        if (!vision_beep_latched)
         {
-            avoid_set_vision_result(vision_result);
-            const char *vision_name = (vision_result == 0) ? "武器" : ((vision_result == 1) ? "补给" : "车辆");
-            printf("vision_get() result: %s\n", vision_name);
-            if (!vision_beep_latched)
-            {
-                vision_beep_request = vision_result + 1;
-                vision_beep_latched = true;
-            }
-        }
-        else
-        {
-            avoid_set_vision_result(-1);
-            vision_beep_latched = false;
+            vision_beep_request = vision_result + 1;
+            vision_beep_latched = true;
         }
     }
+    else
+    {
+        avoid_set_vision_result(-1);
+        vision_beep_latched = false;
+    }
+
     vision_task_busy = 0;
 }
 
@@ -146,10 +180,9 @@ static uint32 send_wrapper(const uint8 *buff, uint32 length)
     if (image_transfer_state == IMAGE_TRANSFER_RUNNING && sent == 0)
     {
         image_transfer_fail_count++;
-        if (image_transfer_fail_count >= 3)
+        if (image_transfer_fail_count == 3)
         {
-            image_transfer_state = IMAGE_TRANSFER_ERROR;
-            printf("[IMAGE] transfer disabled: tcp send failed\r\n");
+            printf("[IMAGE] transfer send busy, keep retrying\r\n");
         }
     }
     else if (sent != 0)
@@ -189,18 +222,15 @@ static void pid_tune_poll_stdin()
             float kp_l, ki_l, kd_l, ff_l, kp_r, ki_r, kd_r, ff_r;
             int min_l, min_r;
 
-            if (sscanf(line, "pidlr %f %f %f %f %d %f %f %f %f %d %d",
-                       &kp_l, &ki_l, &kd_l, &ff_l, &min_l,
-                       &kp_r, &ki_r, &kd_r, &ff_r, &min_r, &target) == 11)
+            if (sscanf(line, "pidlr %f %f %f %f %d %f %f %f %f %d %d", &kp_l, &ki_l, &kd_l, &ff_l, &min_l, &kp_r, &ki_r,
+                       &kd_r, &ff_r, &min_r, &target) == 11)
             {
-                motor_mode6_set_lr_params(kp_l, ki_l, kd_l, ff_l, min_l,
-                                          kp_r, ki_r, kd_r, ff_r, min_r, target);
+                motor_mode6_set_lr_params(kp_l, ki_l, kd_l, ff_l, min_l, kp_r, ki_r, kd_r, ff_r, min_r, target);
                 printf("[MODE6] accepted: %s\r\n", line);
             }
             else if (sscanf(line, "pid %f %f %f %f %d %d", &kp, &ki, &kd, &ff, &min_pwm, &target) == 6)
             {
-                motor_mode6_set_lr_params(kp, ki, kd, ff, min_pwm,
-                                          kp, ki, kd, ff, min_pwm, target);
+                motor_mode6_set_lr_params(kp, ki, kd, ff, min_pwm, kp, ki, kd, ff, min_pwm, target);
                 printf("[MODE6] accepted: %s\r\n", line);
             }
             else if (line[0] != '\0')
@@ -234,7 +264,7 @@ int main()
     // ====================== 2. TCP网络初始化 ======================
     zf_driver_tcp_client tcp_client;
 
-    if (image_transfer_state == IMAGE_TRANSFER_INIT || OSCILLOSCOPE_ENABLE)
+    if (image_transfer_state == IMAGE_TRANSFER_INIT)
     {
         g_tcp_client = &tcp_client;
         if (tcp_client.init(SERVER_IP, PORT) == 0)
@@ -256,7 +286,7 @@ int main()
             g_tcp_client = nullptr;
             if (image_transfer_state == IMAGE_TRANSFER_INIT)
                 image_transfer_state = IMAGE_TRANSFER_ERROR;
-            printf("[OSC] transfer disabled: tcp init failed\r\n");
+            printf("[IMAGE] transfer disabled: tcp init failed\r\n");
         }
 
         seekfree_assistant_interface_init(send_wrapper, read_wrapper);
@@ -381,7 +411,12 @@ int main()
 #endif
 
     printf("System init complete! Running...\r\n");
+#if PID_TUNE_ONLY
     pid_tune_stdin_init();
+#else
+    if (test_mode == 6)
+        pid_tune_stdin_init();
+#endif
 
     // ====================== 5. 主循环 ======================
     static int first_frame = 1; // 第一帧标记
@@ -396,9 +431,8 @@ int main()
             continue;
         }
 
-        pid_tune_poll_stdin();
-
 #if PID_TUNE_ONLY
+        pid_tune_poll_stdin();
         if (first_frame)
         {
             first_frame = 0;
@@ -411,6 +445,7 @@ int main()
 
         if (test_mode == 6)
         {
+            pid_tune_poll_stdin();
             if (first_frame)
             {
                 first_frame = 0;
@@ -441,10 +476,6 @@ int main()
                 }
             }
 
-#if OSCILLOSCOPE_ENABLE
-            if (g_tcp_client != nullptr && car_start_flag)
-                motor_oscilloscope_send();
-#endif
             continue;
         }
 
@@ -453,10 +484,8 @@ int main()
 
         Menu_Process();
 
-#if OSCILLOSCOPE_ENABLE
-        if (g_tcp_client != nullptr && car_start_flag)
-            motor_oscilloscope_send();
-#endif
+        uint16_t *rgb_image = uvc_cam.get_rgb_image_ptr();
+        process_vision_request(rgb_image);
 
         int beep_request = vision_beep_request;
         if (beep_request > 0)
@@ -469,7 +498,7 @@ int main()
         {
             first_frame = 0;
             start_motor_timer(); // 只标记图像就绪，是否发车由 car_start_flag 控制
-            printf("[SYSTEM] First frame OK, wait launch flag.\r\n");
+            printf("准备完毕,可以发车\r\n");
         }
 
 #ifdef DEBUG_PRINT
@@ -477,7 +506,7 @@ int main()
                ImageStatus.Left_Line, ImageStatus.Right_Line, ImageStatus.WhiteLine, ImageFlag.image_element_rings_flag,
                ImageStatus.Road_type);
 #endif
-        uint16_t *rgb_image = uvc_cam.get_rgb_image_ptr();
+#if ENABLE_STARTLINE_STOP
         if (rgb_image != nullptr && car_start_flag)
         {
             static int startline_frame_counter = 0;
@@ -491,51 +520,72 @@ int main()
                 }
             }
         }
+#endif
 
-        // ========== IPS200屏幕显示 ==========
+        // ========== IPS200屏幕显示状态机 ==========
         static const int SCREEN_W = 160;
         static const int SCREEN_H = 120;
         static uint16 screen_buf[SCREEN_H][SCREEN_W]; // IPS200显存缓冲区（RGB565格式，逐飞派原版尺寸）
-        memset(screen_buf, 0, sizeof(screen_buf));
+        static screen_display_state_t last_screen_display_state = SCREEN_DISPLAY_OFF;
 
-        static int last_display_start_flag = -1;
-        if (last_display_start_flag != car_start_flag)
+        if (screen_display_state != SCREEN_DISPLAY_OFF)
         {
-            ips200.clear();
-            last_display_start_flag = car_start_flag;
+            screen_display_state = car_start_flag ? SCREEN_DISPLAY_RUNTIME : SCREEN_DISPLAY_MENU;
         }
 
-        if (!car_start_flag)
+        if (last_screen_display_state != screen_display_state)
         {
-            Menu_Draw();
+            if (screen_display_state != SCREEN_DISPLAY_OFF)
+                ips200.clear();
+            last_screen_display_state = screen_display_state;
         }
-        else if (rgb_image != nullptr)
+
+        switch (screen_display_state)
         {
-            // 步骤1: 直接复制RGB图像到screen_buf（逐飞派原版：不放大）
-            for (int y = 0; y < SCREEN_H; y++) // 120行
-            {
-                int src_y = y * UVC_HEIGHT / SCREEN_H;
-                for (int x = 0; x < SCREEN_W; x++) // 160列
+            case SCREEN_DISPLAY_OFF:
+                break;
+
+            case SCREEN_DISPLAY_MENU:
+                Menu_Draw();
+                break;
+
+            case SCREEN_DISPLAY_RUNTIME:
+                if (rgb_image != nullptr)
                 {
-                    int src_x = x * UVC_WIDTH / SCREEN_W;
-                    screen_buf[y][x] = rgb_image[src_y * UVC_WIDTH + src_x];
+                    static int ips200_frame_divider = 0;
+                    if (++ips200_frame_divider >= 5)
+                    {
+                        ips200_frame_divider = 0;
+                        memset(screen_buf, 0, sizeof(screen_buf));
+
+                        // 步骤1: 直接复制RGB图像到screen_buf（逐飞派原版：不放大）
+                        for (int y = 0; y < SCREEN_H; y++) // 120行
+                        {
+                            int src_y = y * UVC_HEIGHT / SCREEN_H;
+                            for (int x = 0; x < SCREEN_W; x++) // 160列
+                            {
+                                int src_x = x * UVC_WIDTH / SCREEN_W;
+                                screen_buf[y][x] = rgb_image[src_y * UVC_WIDTH + src_x];
+                            }
+                        }
+
+                        // 步骤2: 叠加边界线和轨迹线到screen_buf
+                        draw_boundary_on_screen(screen_buf);   // 左右红色边界
+                        draw_trajectory_on_screen(screen_buf); // 中线蓝色轨迹
+
+                        // 步骤2.5: 叠加横线标记到screen_buf
+                        draw_offline_line_on_screen(screen_buf);   // 🔴丢线位置红色横线
+                        draw_towpoint_lines_on_screen(screen_buf); // 🟢前瞻点范围青色横线
+
+                        // 步骤3: 每5帧刷新一次整个IPS200屏幕，降低屏幕IO占用。
+                        ips200.show_rgb565_image(80, 60, screen_buf[0], SCREEN_W, SCREEN_H, SCREEN_W, SCREEN_H, 0);
+
+                        // 临时关闭菜单显示，改为显示最近一次视觉识别返回值。
+                        ips200.show_string(0, 0, "Vision:");
+                        ips200.show_int(64, 0, latest_vision_result, 2);
+                    }
                 }
-            }
-
-            // 步骤2: 叠加边界线和轨迹线到screen_buf
-            draw_boundary_on_screen(screen_buf);   // 左右红色边界
-            draw_trajectory_on_screen(screen_buf); // 中线蓝色轨迹
-
-            // 步骤2.5: 叠加横线标记到screen_buf
-            draw_offline_line_on_screen(screen_buf); // 🔴丢线位置红色横线
-            draw_towpoint_lines_on_screen(screen_buf); // 🟢前瞻点范围青色横线
-
-            // 步骤3: 刷新整个IPS200屏幕（居中显示160×120）
-            ips200.show_rgb565_image(80, 60, screen_buf[0], SCREEN_W, SCREEN_H, SCREEN_W, SCREEN_H, 0);
-
-            // 临时关闭菜单显示，改为显示最近一次视觉识别返回值。
-            ips200.show_string(0, 0, "Vision:");
-            ips200.show_int(64, 0, latest_vision_result, 2);
+                break;
         }
 
         // ========== 第二部分：逐飞助手图传数据准备（每帧刷新一次）==========
@@ -553,7 +603,7 @@ int main()
             }
 
             // 叠加标注线到图传数据（用于电脑端分析）
-            draw_annotation_on_imagecopy(); // 边界线(浅灰230) + 轨迹线(中灰150)
+            draw_annotation_on_imagecopy();
 
             // ========== 第三部分：发送图传数据到逐飞助手 ==========
             seekfree_assistant_camera_send();
@@ -562,7 +612,6 @@ int main()
 
     return 0;
 }
-
 
 // **************************** 清理函数 ****************************
 void sigint_handler(int signum)
@@ -573,8 +622,11 @@ void sigint_handler(int signum)
 
 void cleanup()
 {
+    car_start_flag = 0;
+    vision_timer_ready = 0;
     pit_timer.stop();
     avoid_timer.stop();
+    vision_timer.stop();
     vision_close();
     printf("程序退出，执行清理操作\r\n");
     motor1_pwm_1.set_duty(0); // ⚠️ 使用 t3 的变量名！

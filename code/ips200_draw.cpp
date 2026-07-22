@@ -334,18 +334,10 @@ void draw_annotation_on_imagecopy(void)
             image_copy[y][right_x] = BOUNDARY_GRAY;
         }
 
-        // 中线轨迹（3像素宽：左-中-右对称）
-        if (mid_x >= 1 && mid_x < (LCDW - 1))
+        // 中线轨迹（单像素）
+        if (mid_x >= 0 && mid_x < LCDW)
         {
             image_copy[y][mid_x] = TRAJECTORY_GRAY;
-            if (mid_x - 1 >= 0)
-            { // 左侧1像素
-                image_copy[y][mid_x - 1] = TRAJECTORY_GRAY;
-            }
-            if (mid_x + 1 < LCDW)
-            { // 右侧1像素
-                image_copy[y][mid_x + 1] = TRAJECTORY_GRAY;
-            }
         }
     }
 

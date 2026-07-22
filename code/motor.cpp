@@ -914,17 +914,6 @@ void motor_control()
     motor_pid_right(); // 右轮PID
 }
 
-void motor_oscilloscope_send()
-{
-    // 逐飞助手虚拟示波器：0左目标 1左实际 2右目标 3右实际。
-    seekfree_assistant_oscilloscope_data.channel_num = 4;
-    seekfree_assistant_oscilloscope_data.data[0] = speed_goal_l;
-    seekfree_assistant_oscilloscope_data.data[1] = (float)encoderA_count;
-    seekfree_assistant_oscilloscope_data.data[2] = speed_goal_r;
-    seekfree_assistant_oscilloscope_data.data[3] = (float)encoderB_count;
-    seekfree_assistant_oscilloscope_send(&seekfree_assistant_oscilloscope_data);
-}
-
 void motor_init()
 {
     motor1_pwm_1.get_dev_info(&motor1_pwm_info);
@@ -1121,7 +1110,7 @@ void motor_diff_pid1()
     static float filtered_turn_output = 0;
 
     // 图像偏差（根据实际调整中线值）
-    float target_center = 40.0f + avoid_get_trans_line();
+    float target_center = 38.0f + avoid_get_trans_line();
     target_center = clamp_float(target_center, 5.0f, 75.0f);
     float turn_error = target_center - ImageStatus.Det_True;
     // 死区控制

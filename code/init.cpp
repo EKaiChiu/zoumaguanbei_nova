@@ -26,8 +26,8 @@ void Interrupt() // 中断函数
         return; // 🛡️ 图像没就绪时不执行电机控制！
     if (!car_start_flag)
         return;                         // 未发车时不执行电机控制
-    imu_yaw_print_task(imu_dev, 0.02f); // IMU yaw debug task, 20ms period
-    test_update(imu_dev, 0.02f);        // Test菜单调试任务
+    imu_yaw_print_task(imu_dev, 0.005f); // IMU yaw debug task, 5ms period
+    test_update(imu_dev, 0.005f);       // Test菜单调试任务
     motor_control();                    // 核心：每5ms执行一次差速和电机PID
 }
 
@@ -87,7 +87,7 @@ void init_all()
 
     if (uvc_cam.init(UVC_PATH) < 0)
     {
-        ips200.show_string(0, 20, "UVC init error");
+        printf("UVC init error\r\n");
     }
 
     // ---- 陀螺仪 IMU660RA 初始化 + 零偏校准 ----
@@ -106,20 +106,17 @@ void init_all()
 
     motor_init(); // 电机 PWM 初始化
     avoid_init();
-    avoid_set_enabled(AVOID_MODE != 0);
+    // avoid_enabled 由 flash/菜单控制，避免启动时被 AVOID_MODE 覆盖。
     test_init();
 
     motor_argument(); // 🌟 必须取消注释！给目标速度和 PID 参数赋值
 
-    ips200.clear();
-    ips200.show_string(106, 112, "Fantasy_Sim");
-    system_delay_ms(100);
-    ips200.clear();
+    // 屏幕可拆卸，启动阶段不主动刷新 IPS200。
 
     // ⚠️ 定时器在这里初始化但先不启动！
     // 由 main.cpp 在第一帧图像处理完后调用 start_motor_timer()
     image_ready_flag = 0;                   // 先禁用电机控制
     car_start_flag = 0;                     // 先不发车
-    pit_timer.init_ms(20, Interrupt);       // 注册中断回调（但flag=0不会执行）
+    pit_timer.init_ms(5, Interrupt);       // 注册中断回调（但flag=0不会执行）
     avoid_timer.init_ms(5, AvoidInterrupt); // 绕行状态机专用中断
 }

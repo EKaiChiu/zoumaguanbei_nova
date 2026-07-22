@@ -9,10 +9,13 @@
 #include "StartLine.hpp"
 #include "Test.hpp"
 
+extern void image_transfer_set_enabled(bool enable);
+extern bool image_transfer_is_enabled(void);
+
 #define MENU_TOP_COUNT 4
 #define MOTOR_ITEM_COUNT MOTOR_SPEED_PARAM_COUNT
 #define PID_ITEM_COUNT MOTOR_TURN_PARAM_COUNT
-#define TEST_ITEM_COUNT 6
+#define TEST_ITEM_COUNT 7
 #define BASE_SPEED_STEP 5
 #define TOWPOINT_STEP 1
 #define STARTLINE_TARGET_STEP 1
@@ -277,8 +280,10 @@ void Menu_Process(void)
                     test_adjust_param(TEST_PARAM_YAW_PRINT, 1);
                   else if (test_index == 4)
                       avoid_set_enabled(true);
-                  else
+                  else if (test_index == 5)
                       beep_set_enabled(1);
+                  else
+                      image_transfer_set_enabled(true);
             }
             else if (key == KEY_2)
             {
@@ -292,17 +297,19 @@ void Menu_Process(void)
                     test_adjust_param(TEST_PARAM_YAW_PRINT, -1);
                   else if (test_index == 4)
                       avoid_set_enabled(false);
-                  else
+                  else if (test_index == 5)
                       beep_set_enabled(0);
+                  else
+                      image_transfer_set_enabled(false);
             }
             else if (key == KEY_4)
             {
                 MyFlash_SaveParameters();
                 towpoint_selected = false;
-                  printf("[MENU] test saved tow=%d/%d startline=%d yaw=%d avoid=%d beep=%d\r\n",
+                  printf("[MENU] test saved tow=%d/%d startline=%d yaw=%d avoid=%d beep=%d img=%d\r\n",
                          towpoint_get_up_row(), towpoint_get_down_row(), startline_get_stop_target(),
                          test_get_yaw_print_enabled() ? 1 : 0, avoid_is_enabled() ? 1 : 0,
-                         beep_is_enabled() ? 1 : 0);
+                         beep_is_enabled() ? 1 : 0, image_transfer_is_enabled() ? 1 : 0);
             }
         }
         else
@@ -412,7 +419,9 @@ void Menu_Draw(void)
         ips200.show_int(104, 88, avoid_is_enabled() ? 1 : 0, 1);
           ips200.show_string(12, 102, test_index == 5 ? ">BeepEn" : " BeepEn");
           ips200.show_int(104, 102, beep_is_enabled() ? 1 : 0, 1);
+          ips200.show_string(12, 116, test_index == 6 ? ">ImgTx" : " ImgTx");
+          ips200.show_int(104, 116, image_transfer_is_enabled() ? 1 : 0, 1);
           if (towpoint_selected)
-              draw_red_marker(0, test_index == 0 ? 34 : (test_index == 1 ? 48 : (test_index == 2 ? 62 : (test_index == 3 ? 76 : (test_index == 4 ? 90 : 104)))));
+              draw_red_marker(0, test_index == 0 ? 34 : (test_index == 1 ? 48 : (test_index == 2 ? 62 : (test_index == 3 ? 76 : (test_index == 4 ? 90 : (test_index == 5 ? 104 : 116))))));
     }
 }

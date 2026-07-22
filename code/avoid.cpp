@@ -28,13 +28,10 @@ float Trans_line = 0.0f;
 
 static float avoid_right_max = 20.0f;
 static float avoid_left_max = 20.0f;
-static float avoid_ring_right_max = 12.0f;
-static float avoid_ring_left_max = 12.0f;
 static float avoid_shift_step = 3.0f;
 static float avoid_return_step = 2.0f;
 static uint16_t avoid_hold_time = 50; // 50 * 5ms = 250ms
-static uint16_t avoid_retrigger_cooldown = 0;
-static const uint16_t AVOID_RETRIGGER_COOLDOWN_TICKS = 400; // 400 * 5ms = 2s
+static const uint16_t AVOID_RETRIGGER_COOLDOWN_TICKS = 200; // 200 * 5ms = 1s
 
 static float clamp_float_local(float value, float min_value, float max_value)
 {
@@ -48,7 +45,7 @@ static float clamp_float_local(float value, float min_value, float max_value)
 const char *avoid_get_param_name(int index)
 {
     static const char *names[AVOID_PARAM_COUNT] = {
-        "RightMax", "LeftMax", "RingR", "RingL", "Shift", "Return", "Hold"};
+        "RightMax", "LeftMax", "Shift", "Return", "Hold"};
 
     if (index < 0 || index >= AVOID_PARAM_COUNT)
         return "Unknown";
@@ -61,11 +58,9 @@ float avoid_get_param_value(int index)
     {
         case 0: return avoid_right_max;
         case 1: return avoid_left_max;
-        case 2: return avoid_ring_right_max;
-        case 3: return avoid_ring_left_max;
-        case 4: return avoid_shift_step;
-        case 5: return avoid_return_step;
-        case 6: return (float)avoid_hold_time;
+        case 2: return avoid_shift_step;
+        case 3: return avoid_return_step;
+        case 4: return (float)avoid_hold_time;
         default: return 0.0f;
     }
 }
@@ -81,18 +76,12 @@ void avoid_set_param_value(int index, float value)
             avoid_left_max = clamp_float_local(value, 0.0f, 80.0f);
             break;
         case 2:
-            avoid_ring_right_max = clamp_float_local(value, 0.0f, 50.0f);
-            break;
-        case 3:
-            avoid_ring_left_max = clamp_float_local(value, 0.0f, 50.0f);
-            break;
-        case 4:
             avoid_shift_step = clamp_float_local(value, 0.5f, 20.0f);
             break;
-        case 5:
+        case 3:
             avoid_return_step = clamp_float_local(value, 0.5f, 20.0f);
             break;
-        case 6:
+        case 4:
         {
             int hold = (int)(value + 0.5f);
             if (hold < 0)
@@ -122,18 +111,12 @@ void avoid_adjust_param(int index, int direction)
             avoid_left_max = clamp_float_local(avoid_left_max + dir * 1.0f, 0.0f, 80.0f);
             break;
         case 2:
-            avoid_ring_right_max = clamp_float_local(avoid_ring_right_max + dir * 1.0f, 0.0f, 50.0f);
-            break;
-        case 3:
-            avoid_ring_left_max = clamp_float_local(avoid_ring_left_max + dir * 1.0f, 0.0f, 50.0f);
-            break;
-        case 4:
             avoid_shift_step = clamp_float_local(avoid_shift_step + dir * 0.5f, 0.5f, 20.0f);
             break;
-        case 5:
+        case 3:
             avoid_return_step = clamp_float_local(avoid_return_step + dir * 0.5f, 0.5f, 20.0f);
             break;
-        case 6:
+        case 4:
         {
             int value = (int)avoid_hold_time + (direction > 0 ? 5 : -5);
             if (value < 0)
@@ -171,12 +154,12 @@ static bool avoid_is_ring_now(void)
 
 static float get_avoid_right_max(void)
 {
-    return avoid_on_ring_latched ? avoid_ring_right_max : avoid_right_max;
+    return avoid_right_max;
 }
 
 static float get_avoid_left_max(void)
 {
-    return avoid_on_ring_latched ? avoid_ring_left_max : avoid_left_max;
+    return avoid_left_max;
 }
 
 static float approach_float(float value, float target, float step)
@@ -208,7 +191,6 @@ static void avoid_reset_runtime(AvoidState state)
     avoid_bias = 0.0f;
     avoid_cnt = 0;
     avoid_on_ring_latched = false;
-    avoid_retrigger_cooldown = 0;
     Trans_line = 0.0f;
     printed_state = -100;
 }
@@ -224,7 +206,14 @@ static void avoid_print_state_once(void)
 
 void avoid_init(void)
 {
-    avoid_reset_runtime(AVOID_DISABLED);
+    // flash/菜单可能已经设置过 avoid_state，这里只做运行时清理，不覆盖开关状态。
+    latest_vision_result = -1;
+    avoid_dir = 0;
+    avoid_bias = 0.0f;
+    avoid_cnt = 0;
+    avoid_on_ring_latched = false;
+    Trans_line = 0.0f;
+    printed_state = -100;
 }
 
 void avoid_set_enabled(bool enable)
@@ -240,7 +229,7 @@ bool avoid_is_enabled(void)
 
 void avoid_set_vision_result(int result)
 {
-    if (avoid_state == AVOID_DISABLED)
+    if (avoid_state == AVOID_DISABLED || avoid_state == AVOID_LOCK)
         return;
 
     latest_vision_result = result;
@@ -258,8 +247,6 @@ void avoid_update_control(void)
 {
     float target_bias = 0.0f;
 
-    if (avoid_state != AVOID_DISABLED && avoid_retrigger_cooldown > 0)
-        avoid_retrigger_cooldown--;
 
     switch (avoid_state)
     {
@@ -276,9 +263,8 @@ void avoid_update_control(void)
             avoid_cnt = 0;
             avoid_on_ring_latched = false;
 
-            if (avoid_has_target() && avoid_retrigger_cooldown == 0)
+            if (avoid_has_target())
             {
-                avoid_retrigger_cooldown = AVOID_RETRIGGER_COOLDOWN_TICKS;
                 avoid_on_ring_latched = avoid_is_ring_now();
 
                 if (avoid_is_left_result(latest_vision_result))
@@ -335,10 +321,14 @@ void avoid_update_control(void)
         case AVOID_LOCK:
             avoid_bias = 0.0f;
             avoid_dir = 0;
+            latest_vision_result = -1;
 
-            if (!avoid_has_target())
+            if (avoid_cnt < AVOID_RETRIGGER_COOLDOWN_TICKS)
             {
-                latest_vision_result = -1;
+                avoid_cnt++;
+            }
+            else
+            {
                 avoid_cnt = 0;
                 avoid_on_ring_latched = false;
                 avoid_state = AVOID_IDLE;

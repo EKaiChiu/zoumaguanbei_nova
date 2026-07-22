@@ -13,9 +13,9 @@
 #include <opencv2/opencv.hpp>
 
 // ===================== 配置 =====================
-static const char *MODEL_PARAM = "tiny_classifier_8fp32.ncnn.param";
-static const char *MODEL_BIN = "tiny_classifier_8fp32.ncnn.bin";
-static const char *LABELS_PATH = "labels8.txt";
+static const char *MODEL_PARAM = "tiny_classifier_7fp32.ncnn.param";
+static const char *MODEL_BIN = "tiny_classifier_7fp32.ncnn.bin";
+static const char *LABELS_PATH = "labels7.txt";
 
 static const int MODEL_SIZE = 96;
 
@@ -34,6 +34,11 @@ static const int MORPH_KERNEL_SIZE = 2;
 
 // 最小红色面积（像素）
 static const int MIN_RED_AREA = 50;
+static const int MAX_RED_AREA = 2000;
+
+// 红框 y 坐标在此范围内才识别并返回结果
+static const int INFER_ROW_MIN = 88;
+static const int INFER_ROW_MAX = 150;
 
 // 长宽比限制
 static const double MIN_ASPECT_RATIO = 0.3;
@@ -190,6 +195,13 @@ bool CarVisionImpl::updateFromFrame(const cv::Mat &img, int &category)
         return false;
     }
 
+    // 红框 y 坐标不在识别范围内，不跑模型也不传值
+    if (red_box.y < INFER_ROW_MIN || red_box.y > INFER_ROW_MAX)
+    {
+        frame_id_++;
+        return false;
+    }
+
     cv::Mat roi = cropRoi(img, red_box);
     if (roi.empty())
     {
@@ -280,7 +292,7 @@ RedBox CarVisionImpl::findTargetRedBox(const cv::Mat &frame)
         double area = cv::contourArea(contours[i]);
         cv::Rect bbox = cv::boundingRect(contours[i]);
 
-        if (area < MIN_RED_AREA)
+        if (area < MIN_RED_AREA || area > MAX_RED_AREA)
         {
             continue;
         }
@@ -500,7 +512,7 @@ int CarVisionImpl::mapToBigId(const std::string &label) const
         return 0;
     }
     // 补给类（ji 拆分为 ji1、ji2）→ 1
-    if (label == "ji1" || label == "ji2" || label == "wang" || label == "wang2" || label == "supplies")
+    if (label == "ji1" || label == "ji2" || label == "wang" || label == "supplies")
     {
         return 1;
     }

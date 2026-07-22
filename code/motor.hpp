@@ -27,7 +27,6 @@ void motor_init(void);
 void motor_pid_left();
 void motor_pid_right();
 void motor_control();
-void motor_oscilloscope_send();
 void motor_mode6_set_lr_params(float kp_l, float ki_l, float kd_l, float ff_l, int min_l, float kp_r, float ki_r, float kd_r, float ff_r, int min_r, int target_speed);
 void motor_mode6_adjust_target(int direction);
 int motor_mode6_get_target(void);

@@ -11,9 +11,9 @@ void avoid_init(void);
 void avoid_set_enabled(bool enable);
 bool avoid_is_enabled(void);
 
-#define AVOID_PARAM_COUNT 7
+#define AVOID_PARAM_COUNT 5
 
-/* Menu tuning interface: index 0~6 maps to avoid.cpp parameters. */
+/* Menu tuning interface: index 0~4 maps to avoid.cpp parameters. */
 const char *avoid_get_param_name(int index);
 float avoid_get_param_value(int index);
 void avoid_set_param_value(int index, float value);
