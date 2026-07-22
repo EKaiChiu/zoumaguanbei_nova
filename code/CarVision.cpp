@@ -37,7 +37,7 @@ static const int MIN_RED_AREA = 50;
 static const int MAX_RED_AREA = 2000;
 
 // 红框 y 坐标在此范围内才识别并返回结果
-static const int INFER_ROW_MIN = 88;
+static const int INFER_ROW_MIN = 80;
 static const int INFER_ROW_MAX = 150;
 
 // 长宽比限制

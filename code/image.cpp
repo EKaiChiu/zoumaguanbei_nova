@@ -105,15 +105,6 @@ static bool Left_Ring_Exit_Image_Ready(void)
     bool width_ok = valid_width_rows >= 10;
     bool ready = off_ok && both_ok && right_ok && width_ok;
 
-    static int print_divider = 0;
-    if (ImageFlag.image_element_rings_flag == 8 && (++print_divider >= 5 || ready))
-    {
-        print_divider = 0;
-        printf("[左环岛][S8->S9] OFF=%d/%s both=%d/%s right=%d/%s width=%d/%s ready=%d\r\n", ImageStatus.OFFLine,
-               off_ok ? "OK" : "NO", lower_both_found, both_ok ? "OK" : "NO", lower_right_found, right_ok ? "OK" : "NO",
-               valid_width_rows, width_ok ? "OK" : "NO", ready ? 1 : 0);
-    }
-
     return ready;
 }
 
@@ -1290,19 +1281,6 @@ void Element_Judgment_Left_Rings()
             Ring_Help_Flag = 1;
     }
 
-    int left_p1_x = 0;
-    int left_p2_x = 0;
-    if (Left_RingsFlag_Point1_Ysite > 0)
-        left_p1_x = ImageDeal[Left_RingsFlag_Point1_Ysite].LeftBoundary_First;
-    if (Left_RingsFlag_Point2_Ysite > 0)
-        left_p2_x = ImageDeal[Left_RingsFlag_Point2_Ysite].LeftBoundary;
-    if (Left_RingsFlag_Point1_Ysite > 0 || Left_RingsFlag_Point2_Ysite > 0 || Ring_Help_Flag == 1)
-    {
-        printf("[左环岛][状态1角点] p1=(%d,%d) p2=(%d,%d) help=%d L=%d R=%d OFF=%d WL=%d\r\n", left_p1_x,
-               Left_RingsFlag_Point1_Ysite, left_p2_x, Left_RingsFlag_Point2_Ysite, Ring_Help_Flag,
-               ImageStatus.Left_Line, ImageStatus.Right_Line, ImageStatus.OFFLine, ImageStatus.WhiteLine);
-    }
-
     if (Left_RingsFlag_Point2_Ysite > Left_RingsFlag_Point1_Ysite + 1 && Ring_Help_Flag == 1 &&
         ImageFlag.image_element_rings_flag == 0)
     {
@@ -1310,7 +1288,7 @@ void Element_Judgment_Left_Rings()
         ImageFlag.image_element_rings = 1;
         ImageFlag.image_element_rings_flag = 1;
         ImageFlag.ring_big_small = 1;
-        printf("[左环岛] 进入状态1\r\n");
+        printf("[左环岛] 进入环岛\r\n");
         beep_short();
 
         ImageStatus.Road_type = LeftCirque;
@@ -1377,26 +1355,13 @@ void Element_Judgment_Right_Rings()
             Ring_Help_Flag = 1;
     }
 
-    int right_p1_x = 0;
-    int right_p2_x = 0;
-    if (Right_RingsFlag_Point1_Ysite > 0)
-        right_p1_x = ImageDeal[Right_RingsFlag_Point1_Ysite].RightBoundary_First;
-    if (Right_RingsFlag_Point2_Ysite > 0)
-        right_p2_x = ImageDeal[Right_RingsFlag_Point2_Ysite].RightBoundary;
-    if (Right_RingsFlag_Point1_Ysite > 0 || Right_RingsFlag_Point2_Ysite > 0 || Ring_Help_Flag == 1)
-    {
-        printf("[右环岛][状态1角点] p1=(%d,%d) p2=(%d,%d) help=%d L=%d R=%d OFF=%d WL=%d\r\n", right_p1_x,
-               Right_RingsFlag_Point1_Ysite, right_p2_x, Right_RingsFlag_Point2_Ysite, Ring_Help_Flag,
-               ImageStatus.Left_Line, ImageStatus.Right_Line, ImageStatus.OFFLine, ImageStatus.WhiteLine);
-    }
-
     if (Right_RingsFlag_Point2_Ysite > Right_RingsFlag_Point1_Ysite + 1 && Ring_Help_Flag == 1 &&
         ImageFlag.image_element_rings_flag == 0)
     {
         ImageFlag.image_element_rings = 2;
         ImageFlag.image_element_rings_flag = 1;
         ImageFlag.ring_big_small = 1;
-        printf("[右环岛] 进入状态1\r\n");
+        printf("[右环岛] 进入环岛\r\n");
         beep_short();
         ImageStatus.Road_type = RightCirque;
     }
@@ -1440,20 +1405,17 @@ void Element_Handle_Left_Rings()
     {
         ImageFlag.image_element_rings_flag = 2;
         // wireless_uart_send_byte(2);
-        printf("[左环岛] 进入状态2\r\n");
     }
     if (ImageFlag.image_element_rings_flag == 2 && num < 10)
     {
 
         ImageFlag.image_element_rings_flag = 5;
-        printf("[左环岛] 进入状态5\r\n");
         // wireless_uart_send_byte(5);
     }
     // 进环
     if (ImageFlag.image_element_rings_flag == 5 && /*num>15)*/ ImageStatus.Right_Line > 15)
     {
         ImageFlag.image_element_rings_flag = 6;
-        printf("[左环岛] 进入状态6\r\n");
         //   ImageStatus.Road_type = LeftCirque;
         // wireless_uart_send_byte(6);
     }
@@ -1462,14 +1424,11 @@ void Element_Handle_Left_Rings()
     if (ImageFlag.image_element_rings_flag == 6 && ImageStatus.Right_Line <= 2)
     {
         ImageFlag.image_element_rings_flag = 7;
-
-        printf("[左环岛] 进入状态7 Right_Line=%d\r\n", ImageStatus.Right_Line);
         // wireless_uart_send_byte(8);
     }
     // 出环 环岛顶点判断
     if (ImageFlag.ring_big_small == 1 && ImageFlag.image_element_rings_flag == 7 && ImageStatus.Right_Line >= 5)
     {
-        printf("[左环岛] 状态8开始扫线");
 
         Point_Ysite = 0;
         Point_Xsite = 0;
@@ -1527,14 +1486,13 @@ void Element_Handle_Left_Rings()
                 Point_Xsite = 1;
         }
 
-        printf("[左环岛][S7] Right_Line=%d OFF=%d search=%d point=(%d,%d) min_rx=%d\r\n", ImageStatus.Right_Line,
-               ImageStatus.OFFLine, search_start, Point_Xsite, Point_Ysite, min_right_x);
+        // printf("[左环岛][S7] Right_Line=%d OFF=%d search=%d point=(%d,%d) min_rx=%d\r\n", ImageStatus.Right_Line,
+        //        ImageStatus.OFFLine, search_start, Point_Xsite, Point_Ysite, min_right_x);
 
         // 找到右侧出口角点后进入 Apex式出环补线阶段。
         if (Point_Ysite > ImageStatus.OFFLine + 15)
         {
             ImageFlag.image_element_rings_flag = 8;
-            printf("[左环岛] 进入状态8 point=(%d,%d)\r\n", Point_Xsite, Point_Ysite);
             // wireless_uart_send_byte(8);
             // Stop = 1;
         }
@@ -1565,7 +1523,6 @@ void Element_Handle_Left_Rings()
         {
             ImageFlag.image_element_rings_flag = 9;
             Left_Ring_Exit_Hold_Frames = 0;
-            printf("[左环岛] 进入状态9 image_ready\r\n");
             // wireless_uart_send_byte(9);
         }
     }
@@ -1821,32 +1778,27 @@ void Element_Handle_Right_Rings()
     if (ImageFlag.image_element_rings_flag == 1 && num > 20)
     {
         ImageFlag.image_element_rings_flag = 2;
-        printf("[右环岛] 进入状态2\r\n");
     }
     if (ImageFlag.image_element_rings_flag == 2 && num < 10)
     {
         ImageFlag.image_element_rings_flag = 5;
-        printf("[右环岛] 进入状态5\r\n");
     }
 
     // 进环。
     if (ImageFlag.image_element_rings_flag == 5 && ImageStatus.Left_Line > 15)
     {
         ImageFlag.image_element_rings_flag = 6;
-        printf("[右环岛] 进入状态6\r\n");
     }
 
     // Apex式图像出环：左侧丢线很少后，开始寻找左侧出口角点。
     if (ImageFlag.image_element_rings_flag == 6 && ImageStatus.Left_Line <= 2)
     {
         ImageFlag.image_element_rings_flag = 7;
-        printf("[右环岛] 进入状态7 Left_Line=%d\r\n", ImageStatus.Left_Line);
     }
 
     // 出环角点判断：镜像左环岛，在左边界中寻找 x 最大的位置。
     if (ImageFlag.ring_big_small == 1 && ImageFlag.image_element_rings_flag == 7 && ImageStatus.Left_Line >= 5)
     {
-        printf("[右环岛] 状态8开始扫线");
         Point_Ysite = 0;
         Point_Xsite = 0;
         int max_left_x = -1;
@@ -1903,13 +1855,12 @@ void Element_Handle_Right_Rings()
                 Point_Xsite = LCDW - 2;
         }
 
-        printf("[右环岛][S7] Left_Line=%d OFF=%d search=%d point=(%d,%d) max_lx=%d\r\n", ImageStatus.Left_Line,
-               ImageStatus.OFFLine, search_start, Point_Xsite, Point_Ysite, max_left_x);
+        // printf("[右环岛][S7] Left_Line=%d OFF=%d search=%d point=(%d,%d) max_lx=%d\r\n", ImageStatus.Left_Line,
+        //        ImageStatus.OFFLine, search_start, Point_Xsite, Point_Ysite, max_left_x);
 
         if (Point_Ysite > ImageStatus.OFFLine + 15)
         {
             ImageFlag.image_element_rings_flag = 8;
-            printf("[右环岛] 进入状态8 point=(%d,%d)\r\n", Point_Xsite, Point_Ysite);
         }
     }
 
@@ -1920,7 +1871,6 @@ void Element_Handle_Right_Rings()
         {
             ImageFlag.image_element_rings_flag = 9;
             Left_Ring_Exit_Hold_Frames = 0;
-            printf("[右环岛] 进入状态9 image_ready\r\n");
         }
     }
 
