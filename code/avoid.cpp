@@ -1,8 +1,6 @@
 #include "avoid.hpp"
 
 #include "image.hpp"
-#include "beep.hpp"
-
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -17,6 +15,13 @@ enum AvoidState
     AVOID_LOCK,
 };
 
+enum SlowState
+{
+    SLOW_IDLE = 0,
+    SLOW_BRAKE,
+    SLOW_APPROACH,
+};
+
 static AvoidState avoid_state = AVOID_DISABLED;
 static int latest_vision_result = -1;
 static int avoid_dir = 0;
@@ -24,9 +29,8 @@ static float avoid_bias = 0.0f;
 static uint16_t avoid_cnt = 0;
 static int printed_state = -100;
 static bool avoid_on_ring_latched = false;
-static bool avoid_pretrigger_slow = false;
-static uint16_t avoid_pretrigger_brake_ticks = 0;
-static const uint16_t AVOID_PRETRIGGER_BRAKE_TICKS = 100; // 100 * 5ms = 0.5s
+static SlowState slow_state = SLOW_IDLE;
+static uint16_t slow_cnt = 0;
 
 float Trans_line = 0.0f;
 
@@ -34,8 +38,13 @@ static float avoid_right_max = 20.0f;
 static float avoid_left_max = 20.0f;
 static float avoid_shift_step = 3.0f;
 static float avoid_return_step = 2.0f;
-static uint16_t avoid_hold_time = 50; // 50 * 5ms = 250ms
-static const uint16_t AVOID_RETRIGGER_COOLDOWN_TICKS = 400; // 400 * 5ms = 2s
+static uint16_t avoid_right_hold_time = 50; // 50 * 5ms = 250ms
+static uint16_t avoid_left_hold_time = 50;
+static const uint16_t AVOID_RETRIGGER_COOLDOWN_TICKS = 200; // 200 * 5ms = 1s
+static const uint16_t SLOW_BRAKE_TICKS = 40; // 40 * 5ms = 0.2s
+static const int SLOW_APPROACH_SPEED = 200;
+
+static void slow_reset(void);
 
 static float clamp_float_local(float value, float min_value, float max_value)
 {
@@ -49,7 +58,7 @@ static float clamp_float_local(float value, float min_value, float max_value)
 const char *avoid_get_param_name(int index)
 {
     static const char *names[AVOID_PARAM_COUNT] = {
-        "RightMax", "LeftMax", "Shift", "Return", "Hold"};
+        "RightMax", "LeftMax", "Shift", "Return", "RightHold", "LeftHold"};
 
     if (index < 0 || index >= AVOID_PARAM_COUNT)
         return "Unknown";
@@ -64,7 +73,8 @@ float avoid_get_param_value(int index)
         case 1: return avoid_left_max;
         case 2: return avoid_shift_step;
         case 3: return avoid_return_step;
-        case 4: return (float)avoid_hold_time;
+        case 4: return (float)avoid_right_hold_time;
+        case 5: return (float)avoid_left_hold_time;
         default: return 0.0f;
     }
 }
@@ -86,13 +96,17 @@ void avoid_set_param_value(int index, float value)
             avoid_return_step = clamp_float_local(value, 0.5f, 20.0f);
             break;
         case 4:
+        case 5:
         {
             int hold = (int)(value + 0.5f);
             if (hold < 0)
                 hold = 0;
             if (hold > 500)
                 hold = 500;
-            avoid_hold_time = (uint16_t)hold;
+            if (index == 4)
+                avoid_right_hold_time = (uint16_t)hold;
+            else
+                avoid_left_hold_time = (uint16_t)hold;
             break;
         }
         default:
@@ -121,13 +135,18 @@ void avoid_adjust_param(int index, int direction)
             avoid_return_step = clamp_float_local(avoid_return_step + dir * 0.5f, 0.5f, 20.0f);
             break;
         case 4:
+        case 5:
         {
-            int value = (int)avoid_hold_time + (direction > 0 ? 5 : -5);
+            uint16_t current = (index == 4) ? avoid_right_hold_time : avoid_left_hold_time;
+            int value = (int)current + (direction > 0 ? 5 : -5);
             if (value < 0)
                 value = 0;
             if (value > 500)
                 value = 500;
-            avoid_hold_time = (uint16_t)value;
+            if (index == 4)
+                avoid_right_hold_time = (uint16_t)value;
+            else
+                avoid_left_hold_time = (uint16_t)value;
             break;
         }
         default:
@@ -195,8 +214,7 @@ static void avoid_reset_runtime(AvoidState state)
     avoid_bias = 0.0f;
     avoid_cnt = 0;
     avoid_on_ring_latched = false;
-    avoid_pretrigger_slow = false;
-    avoid_pretrigger_brake_ticks = 0;
+    slow_reset();
     Trans_line = 0.0f;
     printed_state = -100;
 }
@@ -218,8 +236,7 @@ void avoid_init(void)
     avoid_bias = 0.0f;
     avoid_cnt = 0;
     avoid_on_ring_latched = false;
-    avoid_pretrigger_slow = false;
-    avoid_pretrigger_brake_ticks = 0;
+    slow_reset();
     Trans_line = 0.0f;
     printed_state = -100;
 }
@@ -235,31 +252,57 @@ bool avoid_is_enabled(void)
     return avoid_state != AVOID_DISABLED;
 }
 
+static void slow_reset(void)
+{
+    slow_state = SLOW_IDLE;
+    slow_cnt = 0;
+}
+
+static bool slow_start_if_idle(void)
+{
+    if (slow_state == SLOW_IDLE)
+    {
+        slow_state = SLOW_BRAKE;
+        slow_cnt = 0;
+        return true;
+    }
+    return false;
+}
+
+static void slow_update_5ms(void)
+{
+    if (slow_state == SLOW_BRAKE)
+    {
+        if (slow_cnt < SLOW_BRAKE_TICKS)
+        {
+            slow_cnt++;
+        }
+        else
+        {
+            slow_state = SLOW_APPROACH;
+            slow_cnt = 0;
+        }
+    }
+}
+
 void avoid_set_vision_result(int result)
 {
     if (result == -2)
     {
-        if (!avoid_pretrigger_slow)
-            printf("减速\r\n");
-        if (!avoid_pretrigger_slow && avoid_pretrigger_brake_ticks == 0)
-            avoid_pretrigger_brake_ticks = AVOID_PRETRIGGER_BRAKE_TICKS;
-        avoid_pretrigger_slow = true;
+        if (avoid_state != AVOID_DISABLED)
+            slow_start_if_idle();
         return;
     }
 
     if (result == -1 || result == 2)
     {
-        avoid_pretrigger_slow = false;
-        avoid_pretrigger_brake_ticks = 0;
+        slow_reset();
         latest_vision_result = -1;
         return;
     }
 
     if (result == 0 || result == 1)
-    {
-        avoid_pretrigger_slow = false;
-        avoid_pretrigger_brake_ticks = 0;
-    }
+        slow_reset();
 
     if (avoid_state == AVOID_DISABLED || avoid_state == AVOID_LOCK)
         return;
@@ -269,12 +312,16 @@ void avoid_set_vision_result(int result)
 
 bool avoid_should_slow_for_target(void)
 {
-    return avoid_pretrigger_slow;
+    return slow_state != SLOW_IDLE;
 }
 
-bool avoid_should_brake_for_target(void)
+int avoid_get_speed_limit(void)
 {
-    return avoid_pretrigger_brake_ticks > 0;
+    if (slow_state == SLOW_BRAKE)
+        return 0;
+    if (slow_state == SLOW_APPROACH)
+        return SLOW_APPROACH_SPEED;
+    return -1;
 }
 
 void avoid_force_start(void)
@@ -289,8 +336,7 @@ void avoid_update_control(void)
 {
     float target_bias = 0.0f;
 
-    if (avoid_pretrigger_brake_ticks > 0)
-        avoid_pretrigger_brake_ticks--;
+    slow_update_5ms();
 
     switch (avoid_state)
     {
@@ -299,8 +345,7 @@ void avoid_update_control(void)
             avoid_dir = 0;
             avoid_cnt = 0;
             avoid_on_ring_latched = false;
-            avoid_pretrigger_slow = false;
-            avoid_pretrigger_brake_ticks = 0;
+            slow_reset();
             break;
 
         case AVOID_IDLE:
@@ -334,24 +379,25 @@ void avoid_update_control(void)
             if (fabsf(avoid_bias - target_bias) < 0.5f)
             {
                 avoid_cnt = 0;
-                beep_short();
                 avoid_state = AVOID_HOLD;
                 printed_state = -100;
             }
             break;
 
         case AVOID_HOLD:
+        {
             avoid_bias = (avoid_dir < 0) ? -get_avoid_right_max() : get_avoid_left_max();
             avoid_cnt++;
 
-            if (avoid_cnt >= avoid_hold_time)
+            uint16_t current_hold_time = (avoid_dir < 0) ? avoid_right_hold_time : avoid_left_hold_time;
+            if (avoid_cnt >= current_hold_time)
             {
                 avoid_cnt = 0;
-                beep_short();
                 avoid_state = AVOID_RETURN;
                 printed_state = -100;
             }
             break;
+        }
 
         case AVOID_RETURN:
             avoid_bias = approach_float(avoid_bias, 0.0f, avoid_return_step);
@@ -362,8 +408,7 @@ void avoid_update_control(void)
                 avoid_dir = 0;
                 avoid_cnt = 0;
                 avoid_state = AVOID_LOCK;
-                avoid_pretrigger_slow = false;
-                avoid_pretrigger_brake_ticks = 0;
+                slow_reset();
                 printed_state = -100;
             }
             break;

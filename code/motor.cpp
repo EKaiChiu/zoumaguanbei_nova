@@ -1110,7 +1110,7 @@ void motor_diff_pid1()
     static float filtered_turn_output = 0;
 
     // 图像偏差（根据实际调整中线值）
-    float target_center = 38.0f + avoid_get_trans_line();
+    float target_center = 37.0f + avoid_get_trans_line();
     target_center = clamp_float(target_center, 5.0f, 75.0f);
     float turn_error = target_center - ImageStatus.Det_True;
     // 死区控制
@@ -1194,6 +1194,10 @@ void motor_diff_pid1()
     if (avoid_should_slow_for_target() && current_base_speed > 200)
         current_base_speed = 200;
 
+    int avoid_speed_limit = avoid_get_speed_limit();
+    if (avoid_speed_limit >= 0 && current_base_speed > avoid_speed_limit)
+        current_base_speed = avoid_speed_limit;
+
     // 环岛限速：只要进入环岛相关状态，就先按 Ring 倍率限制最高速度。
 
     // Ring/Small/Mid/Big/Sharp 都可以在 Speed 菜单里以 0.1 步长调整。
@@ -1233,7 +1237,7 @@ void motor_diff_pid1()
     }
 
     // 最低速度保护：防止限速过低导致电机克服不了静摩擦。
-    if (current_base_speed < 45)
+    if (current_base_speed > 0 && current_base_speed < 45)
         current_base_speed = 45;
 
     // 计算左右轮目标速度。

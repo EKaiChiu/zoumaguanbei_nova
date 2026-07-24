@@ -44,7 +44,8 @@ static const char *FLASH_AVOID_KEYS[AVOID_PARAM_COUNT] = {
     "avoid_left_max=",
     "avoid_shift_step=",
     "avoid_return_step=",
-    "avoid_hold_time="};
+    "avoid_right_hold_time=",
+    "avoid_left_hold_time="};
 
 static zf_driver_file_string flash_file(FLASH_PARAM_FILE, "a+");
 static bool flash_ready = false;
@@ -102,6 +103,20 @@ static bool parse_avoid_param(const char *text, int *index, float *value)
             *value = parsed;
             return true;
         }
+    }
+
+    const char *old_hold_key = "avoid_hold_time=";
+    int old_hold_key_len = (int)strlen(old_hold_key);
+    if (strncmp(text, old_hold_key, old_hold_key_len) == 0)
+    {
+        float parsed = 0.0f;
+        if (sscanf(text + old_hold_key_len, "%f", &parsed) != 1)
+            return false;
+        *index = 4;
+        *value = parsed;
+        avoid_set_param_value(5, parsed);
+        flash_loaded_avoid_param[5] = true;
+        return true;
     }
 
     return false;

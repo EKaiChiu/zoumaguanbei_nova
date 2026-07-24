@@ -1,9 +1,16 @@
 #include "image.hpp"
 #include "beep.hpp"
+#include "avoid.hpp"
 static uint8 border_point;
 static uint8 top_point;
 
 extern zf_device_uvc uvc_cam;
+
+static bool RingEntryAllowed(void)
+{
+    int state = avoid_get_state();
+    return state == -1 || state == 0;
+}
 //*****************************************全局变量声明
 
 int ImageScanInterval;                        // 扫描范围   当前行的边界+-ImageScanInterval
@@ -1297,7 +1304,7 @@ void Element_Judgment_Left_Rings()
             Ring_Help_Flag = 1;
     }
 
-    if (Left_RingsFlag_Point2_Ysite > Left_RingsFlag_Point1_Ysite + 1 && Ring_Help_Flag == 1 &&
+    if (RingEntryAllowed() && Left_RingsFlag_Point2_Ysite > Left_RingsFlag_Point1_Ysite + 1 && Ring_Help_Flag == 1 &&
         ImageFlag.image_element_rings_flag == 0)
     {
 
@@ -1371,7 +1378,7 @@ void Element_Judgment_Right_Rings()
             Ring_Help_Flag = 1;
     }
 
-    if (Right_RingsFlag_Point2_Ysite > Right_RingsFlag_Point1_Ysite + 1 && Ring_Help_Flag == 1 &&
+    if (RingEntryAllowed() && Right_RingsFlag_Point2_Ysite > Right_RingsFlag_Point1_Ysite + 1 && Ring_Help_Flag == 1 &&
         ImageFlag.image_element_rings_flag == 0)
     {
         ImageFlag.image_element_rings = 2;

@@ -11,7 +11,7 @@ void avoid_init(void);
 void avoid_set_enabled(bool enable);
 bool avoid_is_enabled(void);
 
-#define AVOID_PARAM_COUNT 5
+#define AVOID_PARAM_COUNT 6
 
 /* Menu tuning interface: index 0~4 maps to avoid.cpp parameters. */
 const char *avoid_get_param_name(int index);
@@ -22,7 +22,8 @@ void avoid_adjust_param(int index, int direction);
 /* 外部传入视觉识别结果。绕行开启时 result=0 左绕，result=1 右绕，其他值不触发。 */
 void avoid_set_vision_result(int result);
 bool avoid_should_slow_for_target(void);
-bool avoid_should_brake_for_target(void);
+/* 返回绕行预识别限速：-1=不限速，0=急刹，正数=限速。 */
+int avoid_get_speed_limit(void);
 void avoid_force_start(void);
 
 /* 绕行专用周期任务。由独立 PIT 中断调用，负责推进绕行状态机。 */
