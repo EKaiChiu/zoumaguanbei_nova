@@ -1,6 +1,7 @@
 #include "avoid.hpp"
 
 #include "image.hpp"
+#include "beep.hpp"
 
 #include <math.h>
 #include <stdint.h>
@@ -23,6 +24,9 @@ static float avoid_bias = 0.0f;
 static uint16_t avoid_cnt = 0;
 static int printed_state = -100;
 static bool avoid_on_ring_latched = false;
+static bool avoid_pretrigger_slow = false;
+static uint16_t avoid_pretrigger_brake_ticks = 0;
+static const uint16_t AVOID_PRETRIGGER_BRAKE_TICKS = 100; // 100 * 5ms = 0.5s
 
 float Trans_line = 0.0f;
 
@@ -31,7 +35,7 @@ static float avoid_left_max = 20.0f;
 static float avoid_shift_step = 3.0f;
 static float avoid_return_step = 2.0f;
 static uint16_t avoid_hold_time = 50; // 50 * 5ms = 250ms
-static const uint16_t AVOID_RETRIGGER_COOLDOWN_TICKS = 200; // 200 * 5ms = 1s
+static const uint16_t AVOID_RETRIGGER_COOLDOWN_TICKS = 400; // 400 * 5ms = 2s
 
 static float clamp_float_local(float value, float min_value, float max_value)
 {
@@ -191,6 +195,8 @@ static void avoid_reset_runtime(AvoidState state)
     avoid_bias = 0.0f;
     avoid_cnt = 0;
     avoid_on_ring_latched = false;
+    avoid_pretrigger_slow = false;
+    avoid_pretrigger_brake_ticks = 0;
     Trans_line = 0.0f;
     printed_state = -100;
 }
@@ -212,6 +218,8 @@ void avoid_init(void)
     avoid_bias = 0.0f;
     avoid_cnt = 0;
     avoid_on_ring_latched = false;
+    avoid_pretrigger_slow = false;
+    avoid_pretrigger_brake_ticks = 0;
     Trans_line = 0.0f;
     printed_state = -100;
 }
@@ -229,10 +237,44 @@ bool avoid_is_enabled(void)
 
 void avoid_set_vision_result(int result)
 {
+    if (result == -2)
+    {
+        if (!avoid_pretrigger_slow)
+            printf("减速\r\n");
+        if (!avoid_pretrigger_slow && avoid_pretrigger_brake_ticks == 0)
+            avoid_pretrigger_brake_ticks = AVOID_PRETRIGGER_BRAKE_TICKS;
+        avoid_pretrigger_slow = true;
+        return;
+    }
+
+    if (result == -1 || result == 2)
+    {
+        avoid_pretrigger_slow = false;
+        avoid_pretrigger_brake_ticks = 0;
+        latest_vision_result = -1;
+        return;
+    }
+
+    if (result == 0 || result == 1)
+    {
+        avoid_pretrigger_slow = false;
+        avoid_pretrigger_brake_ticks = 0;
+    }
+
     if (avoid_state == AVOID_DISABLED || avoid_state == AVOID_LOCK)
         return;
 
     latest_vision_result = result;
+}
+
+bool avoid_should_slow_for_target(void)
+{
+    return avoid_pretrigger_slow;
+}
+
+bool avoid_should_brake_for_target(void)
+{
+    return avoid_pretrigger_brake_ticks > 0;
 }
 
 void avoid_force_start(void)
@@ -247,6 +289,8 @@ void avoid_update_control(void)
 {
     float target_bias = 0.0f;
 
+    if (avoid_pretrigger_brake_ticks > 0)
+        avoid_pretrigger_brake_ticks--;
 
     switch (avoid_state)
     {
@@ -255,6 +299,8 @@ void avoid_update_control(void)
             avoid_dir = 0;
             avoid_cnt = 0;
             avoid_on_ring_latched = false;
+            avoid_pretrigger_slow = false;
+            avoid_pretrigger_brake_ticks = 0;
             break;
 
         case AVOID_IDLE:
@@ -288,6 +334,7 @@ void avoid_update_control(void)
             if (fabsf(avoid_bias - target_bias) < 0.5f)
             {
                 avoid_cnt = 0;
+                beep_short();
                 avoid_state = AVOID_HOLD;
                 printed_state = -100;
             }
@@ -300,6 +347,7 @@ void avoid_update_control(void)
             if (avoid_cnt >= avoid_hold_time)
             {
                 avoid_cnt = 0;
+                beep_short();
                 avoid_state = AVOID_RETURN;
                 printed_state = -100;
             }
@@ -314,6 +362,8 @@ void avoid_update_control(void)
                 avoid_dir = 0;
                 avoid_cnt = 0;
                 avoid_state = AVOID_LOCK;
+                avoid_pretrigger_slow = false;
+                avoid_pretrigger_brake_ticks = 0;
                 printed_state = -100;
             }
             break;

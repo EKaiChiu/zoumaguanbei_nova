@@ -1,3 +1,25 @@
+/*
+                   _ooOoo_
+                  o8888888o
+                  88" . "88
+                  (| -_- |)
+                  O\  =  /O
+               ____/`---'\____
+             .'  \\|     |//  `.
+            /  \\|||  :  |||//  \
+           /  _||||| -:- |||||-  \
+           |   | \\\  -  /// |   |
+           | \_|  ''\---/''  |   |
+           \  .-\__  `-`  ___/-. /
+         ___`. .'  /--.--\  `. . __
+      ."" '<  `.___\_<|>_/___.'  >'"".
+     | | :  `- \`.;`\ _ /`;.`/ - ` : | |
+     \  \ `-.   \_ __\ /__ _/   .-` /  /
+======`-.____`-.___\_____/___.-`____.-'======
+                   `=---='
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            佛祖保佑       永无BUG
+            */
 /*********************************************************************************************************************
  * LS2K0300 Opensourec Library 即（LS2K0300 开源库）是一个基于官方 SDK 接口的第三方开源库
  * Copyright (c) 2022 SEEKFREE 逐飞科技
@@ -47,6 +69,7 @@
 #include "menu.hpp"
 #include "Tof.hpp"
 #include "StartLine.hpp"
+#include "Voltage.hpp"
 
 #define ENABLE_STARTLINE_STOP 0 // 斑马线停车开关：0关闭，1开启
 #include "Key.hpp"
@@ -56,7 +79,7 @@
 #include <errno.h>
 // ====================== 全局宏定义 ======================
 #define SERVER_IP "192.168.137.1"
-#define VISION_TIMER_PERIOD_MS 50
+#define VISION_TIMER_PERIOD_MS 25
 #define PID_TUNE_ONLY 0 // 1: 上电只做电机PID调试，屏蔽巡线/视觉/停车线/菜单发车
 
 // ====================== 网络配置宏定义 ======================
@@ -154,21 +177,42 @@ static void process_vision_request(uint16_t *rgb_image)
     latest_vision_result = vision_result;
 
     static bool vision_beep_latched = false;
+    static bool avoid_print_latched = false;
+    static int vehicle_print_cooldown = 0;
+
+    if (vehicle_print_cooldown > 0)
+        vehicle_print_cooldown--;
+
     if (vision_result >= 0 && vision_result <= 2)
     {
         avoid_set_vision_result(vision_result);
         const char *vision_name = (vision_result == 0) ? "武器" : ((vision_result == 1) ? "补给" : "车辆");
-        printf("vision_get() result: %s\n", vision_name);
-        if (!vision_beep_latched)
+
+        if (vision_result == 0 || vision_result == 1)
         {
-            vision_beep_request = vision_result + 1;
+            if (!avoid_print_latched)
+            {
+                printf("vision_get() result: %s\n", vision_name);
+                avoid_print_latched = true;
+            }
+        }
+        else if (vehicle_print_cooldown == 0)
+        {
+            printf("vision_get() result: %s\n", vision_name);
+            vehicle_print_cooldown = 2000 / VISION_TIMER_PERIOD_MS;
+        }
+
+        if (vision_result == 2 && !vision_beep_latched)
+        {
+            vision_beep_request = 3;
             vision_beep_latched = true;
         }
     }
     else
     {
-        avoid_set_vision_result(-1);
+        avoid_set_vision_result(vision_result);
         vision_beep_latched = false;
+        avoid_print_latched = false;
     }
 
     vision_task_busy = 0;

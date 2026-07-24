@@ -21,6 +21,8 @@ void avoid_adjust_param(int index, int direction);
 
 /* 外部传入视觉识别结果。绕行开启时 result=0 左绕，result=1 右绕，其他值不触发。 */
 void avoid_set_vision_result(int result);
+bool avoid_should_slow_for_target(void);
+bool avoid_should_brake_for_target(void);
 void avoid_force_start(void);
 
 /* 绕行专用周期任务。由独立 PIT 中断调用，负责推进绕行状态机。 */

@@ -19,7 +19,7 @@ static const char *LABELS_PATH = "labels7.txt";
 
 static const int MODEL_SIZE = 96;
 
-static const float CONFIDENCE_THRESH = 0.50f;
+static const float CONFIDENCE_THRESH = 0.40f;
 static const int INFER_INTERVAL = 2;
 
 // ---- 红框检测参数（与 cai3.py 一致）----
@@ -34,11 +34,13 @@ static const int MORPH_KERNEL_SIZE = 2;
 
 // 最小红色面积（像素）
 static const int MIN_RED_AREA = 50;
-static const int MAX_RED_AREA = 2000;
+static const int MAX_RED_AREA = 800;
 
 // 红框 y 坐标在此范围内才识别并返回结果
-static const int INFER_ROW_MIN = 80;
-static const int INFER_ROW_MAX = 150;
+static const int INFER_ROW_MIN = 100;
+static const int INFER_ROW_MAX = 120;
+static const int INFER_COL_MIN = 100;
+static const int INFER_COL_MAX = 160;
 
 // 长宽比限制
 static const double MIN_ASPECT_RATIO = 0.3;
@@ -196,10 +198,14 @@ bool CarVisionImpl::updateFromFrame(const cv::Mat &img, int &category)
     }
 
     // 红框 y 坐标不在识别范围内，不跑模型也不传值
-    if (red_box.y < INFER_ROW_MIN || red_box.y > INFER_ROW_MAX)
+    if (red_box.x < INFER_COL_MAX || red_box.x > INFER_COL_MIN)
     {
-        frame_id_++;
-        return false;
+        if (red_box.y < INFER_ROW_MIN || red_box.y > INFER_ROW_MAX)
+        {
+            category = -2;
+            frame_id_++;
+            return true;
+        }
     }
 
     cv::Mat roi = cropRoi(img, red_box);

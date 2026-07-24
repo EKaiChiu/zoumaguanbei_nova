@@ -9,6 +9,7 @@ extern bool image_transfer_is_enabled(void);
 #include "motor.hpp"
 #include "StartLine.hpp"
 #include "Test.hpp"
+#include "Voltage.hpp"
 
 #include "zf_common_headfile.hpp"
 #include <stdio.h>
@@ -23,6 +24,8 @@ static const char *FLASH_KEY_TEST_YAW_PRINT = "test_yaw_print=";
 static const char *FLASH_KEY_AVOID_ENABLED = "avoid_enabled=";
 static const char *FLASH_KEY_BEEP_ENABLED = "beep_enabled=";
 static const char *FLASH_KEY_IMAGE_TRANSFER_ENABLED = "image_transfer_enabled=";
+static const char *FLASH_KEY_VOLTAGE_ENABLED = "voltage_enabled=";
+static const char *FLASH_KEY_VOLTAGE_PERCENT = "voltage_percent=";
 static const char *FLASH_KEY_SPEED_EXPECT_LIMIT = "speed_expect_limit=";
 static const char *FLASH_TURN_KEYS[MOTOR_TURN_PARAM_COUNT] = {
     "turn_low_kp=",
@@ -53,6 +56,8 @@ static bool flash_loaded_test_yaw_print = false;
 static bool flash_loaded_avoid_enabled = false;
 static bool flash_loaded_beep_enabled = false;
 static bool flash_loaded_image_transfer_enabled = false;
+static bool flash_loaded_voltage_enabled = false;
+static bool flash_loaded_voltage_percent = false;
 static bool flash_loaded_avoid_param[AVOID_PARAM_COUNT] = {false};
 static bool flash_loaded_speed_ratio[5] = {false};
 static bool flash_loaded_speed_expect_limit = false;
@@ -187,7 +192,7 @@ void MyFlash_Init(void)
         !all_turn_params_loaded() || !all_avoid_params_loaded() || !flash_loaded_avoid_enabled ||
         !flash_loaded_towpoint_up || !flash_loaded_towpoint_down ||
         !flash_loaded_startline_stop_target || !flash_loaded_test_yaw_print || !flash_loaded_beep_enabled ||
-        !flash_loaded_image_transfer_enabled)
+        !flash_loaded_image_transfer_enabled || !flash_loaded_voltage_enabled || !flash_loaded_voltage_percent)
     {
         MyFlash_SaveParameters();
     }
@@ -214,6 +219,8 @@ void MyFlash_LoadParameters(void)
     flash_loaded_avoid_enabled = false;
     flash_loaded_beep_enabled = false;
     flash_loaded_image_transfer_enabled = false;
+    flash_loaded_voltage_enabled = false;
+    flash_loaded_voltage_percent = false;
     flash_loaded_speed_expect_limit = false;
     for (int i = 0; i < AVOID_PARAM_COUNT; i++)
         flash_loaded_avoid_param[i] = false;
@@ -320,6 +327,22 @@ void MyFlash_LoadParameters(void)
             continue;
         }
 
+        if (parse_int_key(item, FLASH_KEY_VOLTAGE_ENABLED, &int_value))
+        {
+            voltage_set_enabled(int_value != 0);
+            flash_loaded_voltage_enabled = true;
+            printf("[FLASH] load voltage_enabled=%d\r\n", voltage_is_enabled() ? 1 : 0);
+            continue;
+        }
+
+        if (parse_int_key(item, FLASH_KEY_VOLTAGE_PERCENT, &int_value))
+        {
+            voltage_set_left_percent(int_value);
+            flash_loaded_voltage_percent = true;
+            printf("[FLASH] load voltage_percent=%d\r\n", voltage_get_left_percent());
+            continue;
+        }
+
         int avoid_index = 0;
         float avoid_value = 0.0f;
         if (parse_avoid_param(item, &avoid_index, &avoid_value))
@@ -356,6 +379,10 @@ void MyFlash_LoadParameters(void)
         printf("[FLASH] beep_enabled default=%d\r\n", beep_is_enabled() ? 1 : 0);
     if (!flash_loaded_image_transfer_enabled)
         printf("[FLASH] image_transfer_enabled default=%d\r\n", image_transfer_is_enabled() ? 1 : 0);
+    if (!flash_loaded_voltage_enabled)
+        printf("[FLASH] voltage_enabled default=%d\r\n", voltage_is_enabled() ? 1 : 0);
+    if (!flash_loaded_voltage_percent)
+        printf("[FLASH] voltage_percent default=%d\r\n", voltage_get_left_percent());
 }
 
 void MyFlash_SaveParameters(void)
@@ -454,13 +481,26 @@ void MyFlash_SaveParameters(void)
     else
         flash_loaded_image_transfer_enabled = true;
 
+    snprintf(item, sizeof(item), "%s%d\r\n", FLASH_KEY_VOLTAGE_ENABLED, voltage_is_enabled() ? 1 : 0);
+    if (flash_file.write_string(item) != 0)
+        save_ok = false;
+    else
+        flash_loaded_voltage_enabled = true;
+
+    snprintf(item, sizeof(item), "%s%d\r\n", FLASH_KEY_VOLTAGE_PERCENT, voltage_get_left_percent());
+    if (flash_file.write_string(item) != 0)
+        save_ok = false;
+    else
+        flash_loaded_voltage_percent = true;
+
     if (save_ok)
     {
-        printf("[FLASH] save base=%d limit=%d speed/pid ok avoid ok tow=%d/%d startline=%d yaw=%d avoid=%d beep=%d img=%d\r\n",
+        printf("[FLASH] save base=%d limit=%d speed/pid ok avoid ok tow=%d/%d startline=%d yaw=%d avoid=%d beep=%d img=%d voltage=%d/%d\r\n",
                motor_get_line_base_speed(), (int)motor_get_speed_param_value(6),
                towpoint_get_up_row(), towpoint_get_down_row(), startline_get_stop_target(),
                test_get_yaw_print_enabled() ? 1 : 0, avoid_is_enabled() ? 1 : 0,
-               beep_is_enabled() ? 1 : 0, image_transfer_is_enabled() ? 1 : 0);
+               beep_is_enabled() ? 1 : 0, image_transfer_is_enabled() ? 1 : 0,
+               voltage_is_enabled() ? 1 : 0, voltage_get_left_percent());
     }
     else
     {

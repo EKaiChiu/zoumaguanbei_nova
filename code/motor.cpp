@@ -1182,6 +1182,17 @@ void motor_diff_pid1()
     }
 
     int current_base_speed = line_base_speed;
+    bool pretrigger_brake = avoid_should_brake_for_target();
+
+    if (pretrigger_brake)
+    {
+        diff_speedl_expect = 0;
+        diff_speedr_expect = 0;
+        return;
+    }
+
+    if (avoid_should_slow_for_target() && current_base_speed > 200)
+        current_base_speed = 200;
 
     // 环岛限速：只要进入环岛相关状态，就先按 Ring 倍率限制最高速度。
 

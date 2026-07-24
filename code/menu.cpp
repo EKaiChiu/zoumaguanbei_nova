@@ -8,6 +8,7 @@
 #include "ips200_draw.hpp"
 #include "StartLine.hpp"
 #include "Test.hpp"
+#include "Voltage.hpp"
 
 extern void image_transfer_set_enabled(bool enable);
 extern bool image_transfer_is_enabled(void);
@@ -15,10 +16,11 @@ extern bool image_transfer_is_enabled(void);
 #define MENU_TOP_COUNT 4
 #define MOTOR_ITEM_COUNT MOTOR_SPEED_PARAM_COUNT
 #define PID_ITEM_COUNT MOTOR_TURN_PARAM_COUNT
-#define TEST_ITEM_COUNT 7
+#define TEST_ITEM_COUNT 9
 #define BASE_SPEED_STEP 5
 #define TOWPOINT_STEP 1
 #define STARTLINE_TARGET_STEP 1
+#define VOLTAGE_PERCENT_STEP 5
 
 // 一级菜单：Speed / PID / Avoid / Test
 // Speed 用于调基础速度和各档弯道限速倍率。
@@ -282,8 +284,12 @@ void Menu_Process(void)
                       avoid_set_enabled(true);
                   else if (test_index == 5)
                       beep_set_enabled(1);
-                  else
+                  else if (test_index == 6)
                       image_transfer_set_enabled(true);
+                  else if (test_index == 7)
+                      voltage_set_enabled(true);
+                  else
+                      voltage_set_left_percent(voltage_get_left_percent() + VOLTAGE_PERCENT_STEP);
             }
             else if (key == KEY_2)
             {
@@ -299,17 +305,22 @@ void Menu_Process(void)
                       avoid_set_enabled(false);
                   else if (test_index == 5)
                       beep_set_enabled(0);
-                  else
+                  else if (test_index == 6)
                       image_transfer_set_enabled(false);
+                  else if (test_index == 7)
+                      voltage_set_enabled(false);
+                  else
+                      voltage_set_left_percent(voltage_get_left_percent() - VOLTAGE_PERCENT_STEP);
             }
             else if (key == KEY_4)
             {
                 MyFlash_SaveParameters();
                 towpoint_selected = false;
-                  printf("[MENU] test saved tow=%d/%d startline=%d yaw=%d avoid=%d beep=%d img=%d\r\n",
+                  printf("[MENU] test saved tow=%d/%d startline=%d yaw=%d avoid=%d beep=%d img=%d voltage=%d/%d\r\n",
                          towpoint_get_up_row(), towpoint_get_down_row(), startline_get_stop_target(),
                          test_get_yaw_print_enabled() ? 1 : 0, avoid_is_enabled() ? 1 : 0,
-                         beep_is_enabled() ? 1 : 0, image_transfer_is_enabled() ? 1 : 0);
+                         beep_is_enabled() ? 1 : 0, image_transfer_is_enabled() ? 1 : 0,
+                         voltage_is_enabled() ? 1 : 0, voltage_get_left_percent());
             }
         }
         else
@@ -407,21 +418,33 @@ void Menu_Draw(void)
     {
         ips200.show_string(0, 0, "TEST MENU");
         ips200.show_string(0, 16, towpoint_selected ? "K1+ K2- K4SAVE" : "K1/K2 K3 SEL");
-        ips200.show_string(12, 32, test_index == 0 ? ">TowUp" : " TowUp");
-        ips200.show_int(104, 32, towpoint_get_up_row(), 2);
-        ips200.show_string(12, 46, test_index == 1 ? ">TowDown" : " TowDown");
-        ips200.show_int(104, 46, towpoint_get_down_row(), 2);
-        ips200.show_string(12, 60, test_index == 2 ? ">StopCnt" : " StopCnt");
-        ips200.show_int(104, 60, startline_get_stop_target(), 2);
-        ips200.show_string(12, 74, test_index == 3 ? ">YawPrn" : " YawPrn");
-        ips200.show_int(104, 74, test_get_yaw_print_enabled() ? 1 : 0, 1);
-        ips200.show_string(12, 88, test_index == 4 ? ">AvoidEn" : " AvoidEn");
-        ips200.show_int(104, 88, avoid_is_enabled() ? 1 : 0, 1);
-          ips200.show_string(12, 102, test_index == 5 ? ">BeepEn" : " BeepEn");
-          ips200.show_int(104, 102, beep_is_enabled() ? 1 : 0, 1);
-          ips200.show_string(12, 116, test_index == 6 ? ">ImgTx" : " ImgTx");
-          ips200.show_int(104, 116, image_transfer_is_enabled() ? 1 : 0, 1);
-          if (towpoint_selected)
-              draw_red_marker(0, test_index == 0 ? 34 : (test_index == 1 ? 48 : (test_index == 2 ? 62 : (test_index == 3 ? 76 : (test_index == 4 ? 90 : (test_index == 5 ? 104 : 116))))));
+        const char *test_names[TEST_ITEM_COUNT] = {
+            "TowUp", "TowDown", "StopCnt", "YawPrn", "AvoidEn", "BeepEn", "ImgTx", "VoltEn", "VoltPct"};
+        for (int i = 0; i < TEST_ITEM_COUNT; i++)
+        {
+            int y = 28 + i * 10;
+            ips200.show_string(8, y, test_index == i ? ">" : " ");
+            ips200.show_string(18, y, test_names[i]);
+            if (i == 0)
+                ips200.show_int(104, y, towpoint_get_up_row(), 2);
+            else if (i == 1)
+                ips200.show_int(104, y, towpoint_get_down_row(), 2);
+            else if (i == 2)
+                ips200.show_int(104, y, startline_get_stop_target(), 2);
+            else if (i == 3)
+                ips200.show_int(104, y, test_get_yaw_print_enabled() ? 1 : 0, 1);
+            else if (i == 4)
+                ips200.show_int(104, y, avoid_is_enabled() ? 1 : 0, 1);
+            else if (i == 5)
+                ips200.show_int(104, y, beep_is_enabled() ? 1 : 0, 1);
+            else if (i == 6)
+                ips200.show_int(104, y, image_transfer_is_enabled() ? 1 : 0, 1);
+            else if (i == 7)
+                ips200.show_int(104, y, voltage_is_enabled() ? 1 : 0, 1);
+            else
+                ips200.show_int(104, y, voltage_get_left_percent(), 3);
+        }
+        if (towpoint_selected)
+            draw_red_marker(0, 30 + test_index * 10);
     }
 }

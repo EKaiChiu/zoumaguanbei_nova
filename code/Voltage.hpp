@@ -14,5 +14,11 @@ int voltage_percent_to_duty(int percent);
 void voltage_set_percent(int channel, int percent);
 void voltage_stop(int channel);
 int voltage_get_last_percent(int channel);
+void voltage_set_enabled(bool enabled);
+bool voltage_is_enabled(void);
+void voltage_set_left_percent(int percent);
+int voltage_get_left_percent(void);
+void voltage_apply_left_output(void);
+void voltage_stop_left_output(void);
 
 #endif

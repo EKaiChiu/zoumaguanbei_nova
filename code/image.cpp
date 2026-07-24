@@ -72,8 +72,6 @@ static int Right_Ring_Exit_Center(int left, int right)
 {
     // 右环岛镜像：出环阶段适当靠外。
     int center = (left + right) / 2 + 2;
-    if (center < 37)
-        center = 37;
     if (center > LCDW - 5)
         center = LCDW - 5;
     return center;
@@ -128,7 +126,7 @@ static bool Right_Ring_Exit_Image_Ready(void)
             lower_both_found++;
     }
 
-    return (ImageStatus.OFFLine <= 8 && lower_both_found >= 4 && lower_left_found >= 10 && valid_width_rows >= 10);
+    return (ImageStatus.OFFLine <= 8 && lower_both_found >= 4 && lower_left_found > 4 && valid_width_rows >= 10);
 }
 
 uint8 Half_Road_Wide[60] = // 直道半宽度
@@ -1224,17 +1222,35 @@ void Element_Judgment_Left_Rings()
     //        "否", ImageStatus.WhiteLine, (ImageStatus.WhiteLine <= 5) ? "是" : "否", ImageDeal[55].IsLeftFind,
     //        ImageDeal[56].IsLeftFind, ImageDeal[57].IsLeftFind, ImageDeal[58].IsLeftFind);
     // //    Disf = 0;
-    if (ImageStatus.Right_Line > 2 || ImageStatus.Left_Line < 13 // 13
-        || ImageStatus.OFFLine >= 10
-        //  ||variance_acc>20
-        // || Straight_Judge(2, 25, 45) > 1
-        || ImageStatus.WhiteLine > 5
-        //            || (ImageDeal[48].RightBorder - ImageDeal[48].LeftBorder)<51
-        // || ImageDeal[52].IsLeftFind == 'W'
-        // || ImageDeal[53].IsLeftFind == 'W'
-        // || ImageDeal[54].IsLeftFind == 'W'
-        || ImageDeal[55].IsLeftFind == 'W' || ImageDeal[56].IsLeftFind == 'W' || ImageDeal[57].IsLeftFind == 'W' ||
-        ImageDeal[58].IsLeftFind == 'W')
+    // 左环岛状态1入口过滤条件：不满足这些基础图像特征时，直接认为还不是左环岛。
+    // 1. Right_Line <= 2：右边界应基本完整，左环岛入口通常右侧还是稳定外边线。
+    // 2. Left_Line >= 13：左边界需要有明显丢线，表示左侧出现环岛入口缺口。
+    // 3. OFFLine < 10：有效赛道不能过早断在图像底部，否则图像信息不足。
+    // 4. WhiteLine <= 5：两侧同时丢线不能太多，避免十字/丢线误判成环岛。
+    // 5. 55~58行左边界不能丢：车身近端左边界要稳定，保证入口缺口不是底部噪声。
+    bool left_ring_pre_right_ok = ImageStatus.Right_Line <= 2;
+    bool left_ring_pre_left_ok = ImageStatus.Left_Line >= 13;
+    bool left_ring_pre_off_ok = ImageStatus.OFFLine < 10;
+    bool left_ring_pre_white_ok = ImageStatus.WhiteLine <= 5;
+    bool left_ring_pre_bottom_ok = ImageDeal[55].IsLeftFind != 'W' && ImageDeal[56].IsLeftFind != 'W' &&
+                                   ImageDeal[57].IsLeftFind != 'W' && ImageDeal[58].IsLeftFind != 'W';
+
+    static int left_ring_pre_print_div = 0;
+    if (++left_ring_pre_print_div >= 10)
+    {
+        left_ring_pre_print_div = 0;
+        // printf("[左环岛][状态1条件] R=%d ok=%d L=%d ok=%d OFF=%d ok=%d WL=%d ok=%d L55=%c L56=%c L57=%c L58=%c ok=%d
+        // "
+        //        "flag=%d road=%d\r\n",
+        //        ImageStatus.Right_Line, left_ring_pre_right_ok, ImageStatus.Left_Line, left_ring_pre_left_ok,
+        //        ImageStatus.OFFLine, left_ring_pre_off_ok, ImageStatus.WhiteLine, left_ring_pre_white_ok,
+        //        ImageDeal[55].IsLeftFind, ImageDeal[56].IsLeftFind, ImageDeal[57].IsLeftFind,
+        //        ImageDeal[58].IsLeftFind, left_ring_pre_bottom_ok, ImageFlag.image_element_rings_flag,
+        //        ImageStatus.Road_type);
+    }
+
+    if (!left_ring_pre_right_ok || !left_ring_pre_left_ok || !left_ring_pre_off_ok || !left_ring_pre_white_ok ||
+        !left_ring_pre_bottom_ok)
         return;
     int ring_ysite = 20;
     //  uint8 Left_Less_Num = 0;
@@ -1788,12 +1804,14 @@ void Element_Handle_Right_Rings()
     if (ImageFlag.image_element_rings_flag == 5 && ImageStatus.Left_Line > 15)
     {
         ImageFlag.image_element_rings_flag = 6;
+        printf("[右环岛] 进入状态6\r\n");
     }
 
     // Apex式图像出环：左侧丢线很少后，开始寻找左侧出口角点。
     if (ImageFlag.image_element_rings_flag == 6 && ImageStatus.Left_Line <= 2)
     {
         ImageFlag.image_element_rings_flag = 7;
+        printf("[右环岛] 进入状态7\r\n");
     }
 
     // 出环角点判断：镜像左环岛，在左边界中寻找 x 最大的位置。
@@ -1861,6 +1879,7 @@ void Element_Handle_Right_Rings()
         if (Point_Ysite > ImageStatus.OFFLine + 15)
         {
             ImageFlag.image_element_rings_flag = 8;
+            printf("[右环岛] 进入状态8\r\n");
         }
     }
 
@@ -1870,6 +1889,7 @@ void Element_Handle_Right_Rings()
         if (Right_Ring_Exit_Image_Ready())
         {
             ImageFlag.image_element_rings_flag = 9;
+            printf("[右环岛] 进入状态9\r\n");
             Left_Ring_Exit_Hold_Frames = 0;
         }
     }
@@ -1884,7 +1904,7 @@ void Element_Handle_Right_Rings()
             if (ImageDeal[Ysite].IsRightFind == 'W')
                 num++;
         }
-        if (num < 10)
+        if (num < 5)
         {
             printf("[右环岛] 环岛结束，进入正常道路\r\n");
             beep_short();
@@ -1991,14 +2011,14 @@ void Element_Handle_Right_Rings()
         }
     }
 
-    // 镜像左环岛状态7：左下出口角点连接到图像上方 x=59。
+    // 镜像左环岛状态7：左下出口角点连接到右上固定点 (78, 5)。
     if (ImageFlag.image_element_rings_flag == 7 && Point_Ysite > ImageStatus.OFFLine)
     {
-        int repair_y = ImageStatus.OFFLine;
-        float slope = (float)(Point_Xsite - 59) / (float)(Point_Ysite - repair_y);
+        int repair_y = 5;
+        float slope = (float)(Point_Xsite - 78) / (float)(Point_Ysite - repair_y);
         for (int y = Point_Ysite; y > repair_y; y--)
         {
-            int repaired_left = 59 + (int)(slope * (y - repair_y));
+            int repaired_left = 78 + (int)(slope * (y - repair_y));
             if (repaired_left >= 1 && repaired_left < ImageDeal[y].RightBorder - 4)
             {
                 ImageDeal[y].LeftBorder = repaired_left;
@@ -2085,7 +2105,7 @@ void Element_Test(void)
     )
     {
         Element_Judgment_Left_Rings(); // 左环岛判断
-                                       // Element_Judgment_Right_Rings(); // 右环岛判断
+        // Element_Judgment_Right_Rings(); // 右环岛判断
     }
 }
 
@@ -2233,7 +2253,7 @@ static void CrossBorderRepair(void)
     {
         cross_latched = true;
         cross_release_frames = 0;
-        cross_hold_frames = 3;
+        cross_hold_frames = 1;
         cross_from_top = cross_like_top;
         ImageStatus.Road_type = Cross_ture;
 

@@ -8,6 +8,7 @@ extern zf_driver_gpio motor2_gpio;
 
 static int voltage_left_percent = 0;
 static int voltage_right_percent = 0;
+static bool voltage_enabled = false;
 
 static int voltage_clamp_percent(int percent)
 {
@@ -27,21 +28,42 @@ int voltage_percent_to_duty(int percent)
 void voltage_set_percent(int channel, int percent)
 {
     percent = voltage_clamp_percent(percent);
-    int duty = voltage_percent_to_duty(percent);
 
-    // 固定方向为 0，让电机口两线极性保持一致；需要反向时再单独改这里。
+    // 电压输出已禁用：只记录参数，不再实际驱动电机 PWM 口。
     if (channel == VOLTAGE_CHANNEL_LEFT)
-    {
         voltage_left_percent = percent;
-        motor1_gpio.set_level(0);
-        motor1_pwm_1.set_duty((uint16)duty);
-    }
     else if (channel == VOLTAGE_CHANNEL_RIGHT)
-    {
         voltage_right_percent = percent;
-        motor2_gpio.set_level(0);
-        motor2_pwm_2.set_duty((uint16)duty);
-    }
+}
+
+void voltage_set_enabled(bool enabled)
+{
+    voltage_enabled = enabled;
+}
+
+bool voltage_is_enabled(void)
+{
+    return voltage_enabled;
+}
+
+void voltage_set_left_percent(int percent)
+{
+    voltage_left_percent = voltage_clamp_percent(percent);
+}
+
+int voltage_get_left_percent(void)
+{
+    return voltage_left_percent;
+}
+
+void voltage_apply_left_output(void)
+{
+    // 电压输出已禁用，保留接口避免菜单/flash 编译受影响。
+}
+
+void voltage_stop_left_output(void)
+{
+    // 电压输出已禁用，普通电机停止仍由 stop_car()/motor_control() 管理。
 }
 
 void voltage_stop(int channel)
